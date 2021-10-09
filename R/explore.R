@@ -54,43 +54,43 @@ train_long %>%
   mutate(St = sqrt(St)) %>%
   lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
   summary()
-  ggplot(aes(St, moment_value, color = moment_type)) +
+ggplot(aes(St, moment_value, color = moment_type)) +
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction, scales = "free")
 
 # moment 2
 train_long %>%
-    filter(moment_type == "2") %>%
-    mutate(St = sqrt(St)) %>%
-    lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
-    summary()
-  ggplot(aes(St, moment_value, color = moment_type)) +
-    geom_point() +
-    geom_smooth() +
-    facet_wrap(~ interaction, scales = "free")
+  filter(moment_type == "2") %>%
+  mutate(St = sqrt(St)) %>%
+  lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
+  summary()
+ggplot(aes(St, moment_value, color = moment_type)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction, scales = "free")
 
-  # moment 3
-  train_long %>%
-    filter(moment_type == "3") %>%
-    mutate(St = sqrt(St)) %>%
-    lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
-    summary()
-  ggplot(aes(St, moment_value, color = moment_type)) +
-    geom_point() +
-    geom_smooth() +
-    facet_wrap(~ interaction, scales = "free")
+# moment 3
+train_long %>%
+  filter(moment_type == "3") %>%
+  mutate(St = sqrt(St)) %>%
+  lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
+  summary()
+ggplot(aes(St, moment_value, color = moment_type)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction, scales = "free")
 
 # moment 4
-  train_long %>%
-    filter(moment_type == "4") %>%
-    mutate(St = sqrt(St)) %>%
-    lm(moment_value ~ poly(St, 2)*interaction, data = .) %>%
-    summary()
-  ggplot(aes(St, moment_value, color = moment_type)) +
-    geom_point() +
-    geom_smooth() +
-    facet_wrap(~ interaction, scales = "free")
+train_long %>%
+  filter(moment_type == "4") %>%
+  mutate(St = sqrt(St)) %>%
+  lm(moment_value ~ poly(St, 2)*interaction, data = .) %>%
+  summary()
+ggplot(aes(St, moment_value, color = moment_type)) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction, scales = "free")
 
 
 train %>%
