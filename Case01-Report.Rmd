@@ -1,0 +1,30 @@
+---
+title: "Case01-Report"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = F, message = F, warning=F)
+```
+
+```{r load-library}
+library(tidyverse)
+library(here)
+```
+
+```{r load-data}
+train <- read.csv(here("data", "data-train.csv"))
+test <- read.csv(here("data", "data-test.csv"))
+```
+
+## Introduction 
+
+## Methods
+
+## Results
+
+## Discussion
+
+## References
+
+## Appendix 
