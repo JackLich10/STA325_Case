@@ -1,6 +1,6 @@
 ---
 title: "Case01-Report"
-author: "Jingxuan Liu, Linda Tang, Justin Zhao, Mary Wang, Abbey List, and Jack Lichtenstein"
+author: "Jack Lichtenstein, Abbey List, Jingxuan Liu, Linda Tang, Mary Wang, and Justin Zhao"
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
@@ -23,9 +23,11 @@ train <- read.csv(here("data", "data-train.csv"))
 test <- read.csv(here("data", "data-test.csv"))
 ```
 
-## Introduction 
+## 1 Introduction 
 
-## Methods
+## 2 Methods
+
+### 2.1 EDA 
 
 Before we begin any analysis, let's further split our training data into a smaller train and test set. We also create cross-validation folds with $K=5$. We do this in an effort to reduce the likelihood of overfitting to the full training data.
 
@@ -41,18 +43,7 @@ set.seed(234)
 folds <- rsample::vfold_cv(tr, v = 5)
 ```
 
-Below we visualize a histogram of the three numerical predictors in these data, `Fr`, `Re`, and `St`. We notice that while the predictors `Fr` and `Re` seem continuous, they are more like factor levels than numeric. As such, we convert both variables to factors.
-
-```{r hist pred, echo=FALSE}
-# histograms of predictors
-tr %>%
-  pivot_longer(cols = c(St:Fr),
-               names_to = "metric",
-               values_to = "value") %>%
-  ggplot(aes(value)) +
-  geom_histogram() +
-  facet_wrap(~ metric, scales = "free")
-```
+While Fr and Re consists of continuous values in real life, a brief examination of our training data reveals that both two variables contain only three levels. As such, we convert both variables to factors.
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -60,9 +51,19 @@ train <- train %>%
   mutate(across(c(Fr, Re), factor))
 ```
 
-Below, we plot the relationship between the three predictor variables and each of the four response variables. Note, the curves fit to the points are via local polynomial regression.
+Below, we plot the relationship between the three predictor variables and each of the four response variables (Figure 1 contains graphs for Moment 1. For plots relating to Moments 2-4, please refer to Figures XX-XX in the Appendix). Note, the curves fit to the points are via local polynomial regression.
 
-```{r eda plots, echo=FALSE}
+```{r Figure-1, fig.cap = "Moment 1 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_1, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 1", color = "Fr:Re")
+```
+
+
+```{r eda plots, echo=FALSE, eval=FALSE}
 tr_long <- tr %>%
   pivot_longer(cols = starts_with("R_moment"),
                names_to = "moment",
@@ -191,3 +192,41 @@ cv_summarized %>%
 ## References
 
 ## Appendix 
+
+```{r hist pred, fig.height = 6}
+# histograms of predictors
+tr %>%
+  pivot_longer(cols = c(St:Fr),
+               names_to = "metric",
+               values_to = "value") %>%
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+```{r Figure-S1, fig.cap = "Moment 2 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_2, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 2", color = "Fr:Re")
+```
+
+```{r Figure-S2, fig.cap = "Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_3, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 3", color = "Fr:Re")
+```
+
+```{r Figure-S3, fig.cap = "Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_4, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 4", color = "Fr:Re")
+```
