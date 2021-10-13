@@ -29,8 +29,7 @@ TTurbulence is a fundamental concept in fluid mechanics. Understanding how fluid
 
 Despite the importance of turbulence and particle clustering, we do not understand this process well very. Researchers has primarily used Direct Numerical Simulation (DNS) of Navier-Stokes equations to study this problem, but it is extremely time consuming and computationally expensive (Moin & Mahesh, 1998). In addition, the DNS method cannot be practically applied to simulate flows with large Reynolds numbers which requires high resolution, leading to long computation time. However, large Reynolds numbers is highly relevant to real life situations (atmospheric, oceanic turbulence flow). Thus, the primary research **objective** of this study is to build a statistical model to investigate how Reynolds (Re) number, Froude (Fr) number and Stokes (St) number influence particle cluster volume distribution and allows prediction without the need for simulation. 
 
-The data for this study comes from Direct Numerical Simulation using a range of parameters. Then, Voronoi Tessellation, a technique that looks at general features of individual clusters in the underlying turbulence, has been applied to generate a distribution of cluster volumes. Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$ and partition our focus into four new response variables. We plan to use each of the four moments as responses variables and the parameters as predictors. 
-Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate. We hope that our research model will enable a quick and efficient prediction of a particle cluster volume distribution and enhance our understanding of the relative influence of these parameters in turbulent flow.
+The data for this study comes from Direct Numerical Simulation using a range of parameters. Then, Voronoi Tessellation, a technique that looks at general features of individual clusters in the underlying turbulence, has been applied to generate a distribution of cluster volumes. Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$ and partition our focus into four new response variables. We plan to use each of the four moments as responses variables and the parameters as predictors. Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate. We hope that our research model will enable a quick and efficient prediction of a particle cluster volume distribution and enhance our understanding of the relative influence of these parameters in turbulent flow.
 
 ## 2 Methods
 
@@ -50,7 +49,8 @@ set.seed(234)
 folds <- rsample::vfold_cv(tr, v = 5)
 ```
 
-While Fr and Re consists of continuous values in real life, a brief examination of our training data reveals that both two variables contain only three levels. As such, we convert both variables to factors.
+While Fr and Re consists of continuous values in real life, a brief examination of our training data reveals that both two variables contain only three levels (Appendix). As such, we convert both variables to factors. 
+Fr can take on value inf, 0.3, 0.052, Re can be 90, 224, 398, and St is continuous beteen 0-3. *Rationale for using categorical Fr*: Simulation were done on 3 difference levels of Fr (inf, 0.3, 0.052). 0.3 represents cumulonimbus clouds, 0.052 represents cumulus clouds. The stronger gravity, the larger the Fr. We will also build a separate model to model continuous Fr and Re (allow for extrapolation). 
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -194,6 +194,8 @@ cv_summarized %>%
 
 ## Results
 
+Model Output:
+
 ## Discussion
 
 \newpage
@@ -212,14 +214,11 @@ cv_summarized %>%
 
 - slides: https://sakai.duke.edu/access/content/group/e1e1b166-17bd-4efc-bdfb-f3909d696910/Case%20Study/Data_Expedition_F2020_Reza_Jon.pdf
 
-
-
-
 \newpage
 
 ## Appendix 
 
-```{r hist pred, fig.height = 6}
+```{r hist pred, fig.height = 3, fig.width=8}
 # histograms of predictors
 tr %>%
   pivot_longer(cols = c(St:Fr),
