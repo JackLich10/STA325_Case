@@ -28,7 +28,7 @@ test <- read.csv("data/data-test.csv")
 
 ```{r setup-moments}
 train <- train %>%
-  mutate(
+  dplyr::mutate(
     central_1 = R_moment_1, #mean
     central_2 = R_moment_2 - R_moment_1^2, #var
     central_3 = (R_moment_3 - 3*R_moment_2*R_moment_1 + 2*R_moment_1^3), #skew
@@ -147,37 +147,48 @@ cv <- tidyr::crossing(fold = 1:5,
 ```
 
 ```{r, echo=FALSE}
-# undo central
-cv_wide <- cv %>%
-    dplyr::group_by(index, fold, degree, root, log) %>%
-    summarise(moment, pred)
-  cv_wide <- cv_wide %>%
-    reshape2::dcast(index + fold + degree + root + log ~ moment, value.var="pred")
-  
-  for (i in 1:nrow(cv_wide)) {
-      cv_wide[i, "2"] = cv_wide[i, "2"] + cv_wide[i, "1"]^2
-      cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["root"] == cv_wide[i, "root"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["moment"] == 2), "pred"] = cv_wide[i, "2"] 
-      cv_wide[i, "3"] = cv_wide[i, "3"] - 2*cv_wide[i, "1"]^3 + 3*cv_wide[i, "2"]*cv_wide[i, "1"]
-      cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["root"] == cv_wide[i, "root"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["moment"] == 3), "pred"] = cv_wide[i, "3"]
-      cv_wide[i, "4"] = cv_wide[i, "4"] + 3*cv_wide[i, "1"]^4 - 6*cv_wide[i, "2"]*cv_wide[i, "1"]^2 + 4*cv_wide[i, "3"]*cv_wide[i, "1"]
-      cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["root"] == cv_wide[i, "root"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["moment"] == 4), "pred"] = cv_wide[i, "4"]
-  }
-  
-cv_summarized <- cv %>%
+# transform cv to wide format
+cv_wide <- cv %>% 
+  dplyr::transmute(index, fold, degree, root, log, 
+                   moment = paste0("central_", moment), 
+                   pred) %>% 
+  tidyr::pivot_wider(names_from = moment,
+                     values_from = pred)
+
+# undo central moments
+cv_summarized <- cv_wide %>% 
+  dplyr::mutate(R_moment_1 = central_1,
+                R_moment_2 = central_2 + R_moment_1^2,
+                R_moment_3 = central_3 + 3*R_moment_2*R_moment_1 - 2*R_moment_1^3,
+                R_moment_4 = central_4 + 4*R_moment_3*R_moment_1 - 6*R_moment_2*R_moment_1^2 + 3*R_moment_1^4) %>% 
+  # pivot back longer
+  tidyr::pivot_longer(cols = dplyr::starts_with("R_moment_"),
+                      names_to = "moment",
+                      values_to = "pred") %>% 
+  # join in actual values for each moment
+  dplyr::left_join(train %>% 
+                     dplyr::select(index, dplyr::starts_with("R_moment_")) %>% 
+                     tidyr::pivot_longer(cols = dplyr::starts_with("R_moment_"),
+                                         names_to = "moment",
+                                         values_to = "target"),
+                   by = c("index", "moment")) %>% 
   dplyr::group_by(moment = factor(moment), degree, root, log) %>%
   dplyr::summarise(rmse = sqrt(mean((pred-target)^2)),
                    mae = mean(abs(pred-target)),
                    broom::glance(lm(target ~ pred, data = dplyr::cur_data())),
-                   .groups = "drop")
+                   .groups = "drop") 
+
+# plot results
 cv_summarized %>% 
-  dplyr::filter(!(log)) %>% 
-  dplyr::mutate(moment = paste0("Moment: ", moment)) %>%
   tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>%
   tidyr::unite(type, moment, name, sep = ": ", remove = FALSE) %>%
   ggplot(aes(root, value, color = as.factor(degree))) +
   geom_line() +
   geom_point() +
-  facet_wrap(~ type, scales = "free", nrow = 4)
+  facet_wrap(~ type, scales = "free", nrow = 4) +
+  labs(x = "Degree of root on `St`",
+       y = NULL,
+       color = "Degree of polynomial on `St`")
 ```
 
 ### 2.4 Model Extension
@@ -199,7 +210,7 @@ model1 <- train %>%
   lm(central_1 ~ poly(St, 1)*interaction, data = .)
 # summary(model1)
 kableExtra::kable(tidy(model1), format = "markdown", digits = 3, 
-      caption = "Moment 1 Results")
+                  caption = "Moment 1 Results")
 #plot(model1)
 ```
 
@@ -211,7 +222,7 @@ model2 <- train %>%
   lm(central_2 ~ poly(St, 2)*interaction, data = .)
 #summary(model2)
 kableExtra::kable(tidy(model2), format = "markdown", digits = 3, 
-      caption = "Moment 2 Results")
+                  caption = "Moment 2 Results")
 #plot(model2)
 ```
 
@@ -223,7 +234,7 @@ model3 <- train %>%
   lm(central_3 ~ poly(St, 2)*interaction, data = .)
 #summary(model3)
 kableExtra::kable(tidy(model3), format = "markdown", digits = 3, 
-      caption = "Moment 3 Results")
+                  caption = "Moment 3 Results")
 #plot(model3)
 ```
 
@@ -235,32 +246,35 @@ model4 <- train %>%
   lm(central_4 ~ poly(St, 2)*interaction, data = .)
 #summary(model4)
 kableExtra::kable(tidy(model4), format = "markdown", digits = 3, 
-      caption = "Moment 4 Results")
+                  caption = "Moment 4 Results")
 #plot(model4)
 ```
 
-```{r}
-test$R_moment_1 = test %>%
-  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+```{r predict on holdout}
+test <- test %>% 
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE)
+
+# central 1
+test$central_1 = test %>% 
   predict(model1, ., type = "response")
-test$R_moment_2 = test %>%
+# central 2
+test$central_2 = test %>%
   mutate(St = St^(1/4)) %>%
-  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   predict(model2, ., type = "response")
-test$R_moment_3 = test %>%
+# central 3
+test$central_3 = test %>%
   mutate(St = St^(1/3)) %>%
-  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   predict(model3, ., type = "response")
-test$R_moment_4 = test %>%
+# central 4
+test$central_4 = test %>%
   mutate(St = sqrt(St)) %>%
-  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   predict(model4, ., type = "response")
 
-for (i in 1:nrow(test)) {
-      test[i, "R_moment_2"] = test[i, "R_moment_2"] + test[i, "R_moment_1"]^2
-      test[i, "R_moment_3"] = test[i, "R_moment_3"] - 2*test[i, "R_moment_1"]^3 + 3*test[i, "R_moment_2"]*test[i, "R_moment_1"]
-      test[i, "R_moment_4"] = test[i, "R_moment_4"] + 3*test[i, "R_moment_1"]^4 - 6*test[i, "R_moment_2"]*test[i, "R_moment_1"]^2 + 4*test[i, "R_moment_3"]*test[i, "R_moment_1"]
-}
+test <- test %>% 
+  dplyr::mutate(R_moment_1 = central_1,
+                R_moment_2 = central_2 + R_moment_1^2,
+                R_moment_3 = central_3 + 3*R_moment_2*R_moment_1 - 2*R_moment_1^3,
+                R_moment_4 = central_4 + 4*R_moment_3*R_moment_1 - 6*R_moment_2*R_moment_1^2 + 3*R_moment_1^4)
 
 # write.csv(test, file="data/data-test_pred.csv")
 ```
@@ -315,9 +329,9 @@ tr %>%
 ```{r eda plots, echo=FALSE, eval=FALSE}
 tr_long <- tr %>%
   tidyr::pivot_longer(cols = starts_with("R_moment"),
-               names_to = "moment",
-               names_prefix = "R_moment_",
-               values_to = "value") 
+                      names_to = "moment",
+                      names_prefix = "R_moment_",
+                      values_to = "value") 
 # plot St vs. R_moment_*, color by interaction between Fr, Re
 tr_long %>%
   ggplot(aes(St, value, color = interaction(Fr, Re))) +
