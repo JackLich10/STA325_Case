@@ -16,6 +16,7 @@ knitr::opts_chunk$set(echo = F, message = F, warning=F)
 library(tidyverse)
 library(here)
 library(splines)
+library(broom)
 theme_set(theme_light()) # setting a theme
 ```
 
@@ -186,7 +187,9 @@ Model Output:
 model1 <- train %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_1 ~ poly(St, 1)*interaction, data = .)
-summary(model1)
+# summary(model1)
+kableExtra::kable(tidy(model1), format = "markdown", digits = 3, 
+      caption = "Moment 1 Results")
 #plot(model1)
 ```
 
@@ -196,7 +199,9 @@ model2 <- train %>%
   mutate(St = St^(1/4)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_2 ~ poly(St, 2)*interaction, data = .)
-summary(model2)
+#summary(model2)
+kableExtra::kable(tidy(model2), format = "markdown", digits = 3, 
+      caption = "Moment 2 Results")
 #plot(model2)
 ```
 
@@ -206,7 +211,9 @@ model3 <- train %>%
   mutate(St = St^(1/3)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_3 ~ poly(St, 2)*interaction, data = .)
-summary(model3)
+#summary(model3)
+kableExtra::kable(tidy(model3), format = "markdown", digits = 3, 
+      caption = "Moment 3 Results")
 #plot(model3)
 ```
 
@@ -216,7 +223,9 @@ model4 <- train %>%
   mutate(St = sqrt(St)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_4 ~ poly(St, 2)*interaction, data = .)
-summary(model4)
+#summary(model4)
+kableExtra::kable(tidy(model4), format = "markdown", digits = 3, 
+      caption = "Moment 4 Results")
 #plot(model4)
 ```
 
@@ -243,7 +252,7 @@ for (i in 1:nrow(test)) {
       test[i, "R_moment_4"] = test[i, "R_moment_4"] + 3*test[i, "R_moment_1"]^4 - 6*test[i, "R_moment_2"]*test[i, "R_moment_1"]^2 + 4*test[i, "R_moment_3"]*test[i, "R_moment_1"]
 }
 
-write.csv(test, file="data/data-test_pred.csv")
+# write.csv(test, file="data/data-test_pred.csv")
 ```
 
 ## Discussion
