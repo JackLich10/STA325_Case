@@ -37,18 +37,28 @@ train <- train %>%
 
 ## 1 Introduction 
 
-Turbulence is a fundamental concept in fluid mechanics. Understanding how fluids move has enormous importance to a vast range of problems, with practical applications in aeronautical engineering, environmental science, astronomy, and more. In contrast to laminar flow, turbulent flow is irregular, unpredictable, and energy-dissipating. Turbulence enhances mixing which leads to non-uniform distribution of particles and cluster formation. In general, the final state of particles subject to turbulent flow is determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number. The Reynolds number is a measure of the intensity of turbulence, with a higher Reynolds number corresponding to a higher intensity of turbulence (J. den Toonder et al., 1997). Broadly speaking, a Reynolds number > 4000 generally represents a relatively chaotic and turbulent flow, a Reynolds number < 2300 generally represents a smooth laminar flow and any number in between typically represents transient flow (Schlichting et al., 2017). The Froude number is a measure of the impact of gravitational acceleration on fluid motion. For instance, a cumulonimbus cloud at a high level above the ground will have a smaller Froude number (compared to lower hanging stratus clouds) because it experiences a lower intensity of gravitational acceleration relative to other clouds (Chanson, 2009). Stokes number is a description of particle properties; a large Stokes number correlates with large particle size which tends to form relatively loose clusters (Ireland et al., 2016). 
+Turbulence is a fundamental concept in fluid mechanics. Irregular, unpredictable, and energy-dissipating, turbulent flow enhances mixing, which leads to non-uniform distribution of particles and cluster formation. Understanding and predicting turbulence has great practical significance in many scientific areas including aeronautical engineering and environmental science.
 
-Despite the importance of turbulence and particle clustering, we do not understand this process well very. Researchers has primarily used Direct Numerical Simulation (DNS) of Navier-Stokes equations to study this problem, but it is extremely time consuming and computationally expensive (Moin & Mahesh, 1998). In addition, the DNS method cannot be practically applied to simulate flows with large Reynolds numbers which requires high resolution, leading to long computation time. However, large Reynolds numbers is highly relevant to real life situations (atmospheric, oceanic turbulence flow). Thus, the primary research **objective** of this study is to build a statistical model to investigate how Reynolds (Re) number, Froude (Fr) number and Stokes (St) number influence particle cluster volume distribution and allows prediction without the need for simulation. 
+Existing research suggests that the clustering of particles subject toturbulent flow is mainly determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number, which correspond to the intentsity of turbulence, impact of gravitational acceleration, and particle properties. <!-- insert 1 example on individual influence; followed by one on interaction --> 
 
-The data for this study comes from Direct Numerical Simulation using a range of parameters. Then, Voronoi Tessellation, a technique that looks at general features of individual clusters in the underlying turbulence, has been applied to generate a distribution of cluster volumes. Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, the latter three which we transform to central moments as response variables for inference and back for prediction. Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate. We hope that our research model will enable a quick and efficient prediction of a particle cluster volume distribution and enhance our understanding of the relative influence of these parameters in turbulent flow.
+Despite the importance of turbulence, current understanding of *how* Re, Fr, and St contribute to clustering remains rudimentary. Similation methods like the Direct Numerical Simulation (DNS) of Navier-Stokes equations have been applied, but progress is limited by the time-consuming and computationally-expensive nature of such methodologies (Moin & Mahesh, 1998). Leveraging on generated data, the present study *aims* to build a statistical model that investigates how Re, Fr and St influence particle cluster volume distribution. We hope that our model will 1) enhance our understanding of the relative influence of these parameters in turbulent flow, and 2) enable a quick and efficient prediction of a particle cluster volume distribution without the needs for simulation.
 
 ## 2 Methods
 
-### 2.1 Model
+### 2.1 Data
+
+The data (*n* = 89) for the present study comes from Direct Numerical Simulation. Voronoi Tessellation, a technique that examines general features of individual clusters in the underlying turbulence, was applied to generate a distribution of cluster volumes. The original data contains information regarding the generated distributions in the form of the first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, as well as Re, Fr, and St values. 
+
+For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments, which describe the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, a closer examination of the data reveals that Fr and Re only contains three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$) in the data, despite their numerical nature. Given such, the variables were converted into factors (See Section 2.4 for an alternative modeling approach that may overcome this limitation). 
+
+### 2.2 Model Selection
+
+
+
+### 2.3 Final Models
 
 The forms of the statistical models, one for each moment, are:
-$$R\_moment_1 \sim St*(Fr, Re)$$
+$$R\_{moment_1} \sim St*(Fr, Re)$$
 $$central_2 \sim poly(St^{1/4}, 2) * (Fr, Re)$$
 $$central_3 \sim poly(St^{1/3}, 2) * (Fr, Re)$$
 $$central_4 \sim poly(\sqrt{St}, 2) * (Fr, Re)$$
@@ -57,7 +67,7 @@ where $Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$ are categorica
 
 ### 2.2 Justification
 
-While $Fr$ and $Re$ are continuous values in physics, both variables contain only three levels in our training and test data (Appendix). Since we see from the test data that we are specifically interested in these levels, we treat both as categorical variables in modeling. For $Fr$ in particular, 0.3 represents cumulonimbus clouds and 0.052 represents cumulus clouds. See 2.4 for a separate model set that addresses these limitations. 
+
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -256,6 +266,20 @@ for (i in 1:nrow(test)) {
 ```
 
 ## Discussion
+
+Broadly speaking, a Reynolds number > 4000 generally represents a relatively chaotic and turbulent flow, a Reynolds number < 2300 generally represents a smooth laminar flow and any number in between typically represents transient flow (Schlichting et al., 2017).
+
+However, large Reynolds numbers is highly relevant to real life situations (atmospheric, oceanic turbulence flow).
+
+The Reynolds number is a measure of the intensity of turbulence, with a higher Reynolds number corresponding to a higher intensity of turbulence (J. den Toonder et al., 1997). The Froude number is a measure of the impact of gravitational acceleration on fluid motion;  
+
+For instance, a cumulonimbus cloud at a high level above the ground will have a smaller Froude number (compared to lower hanging stratus clouds) because it experiences a lower intensity of gravitational acceleration relative to other clouds (Chanson, 2009). Stokes number is a description of particle properties; a large Stokes number correlates with large particle size which tends to form relatively loose clusters (Ireland et al., 2016). 
+
+but it is extremely time consuming and computationally expensive . In addition, the DNS method cannot be practically applied to simulate flows with large Reynolds numbers which requires high resolution, leading to long computation time. 
+
+Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, the latter three which we transform to central moments as response variables for inference and back for prediction. Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate.
+
+For $Fr$ in particular, 0.3 represents cumulonimbus clouds and 0.052 represents cumulus clouds.
 
 \newpage
 
