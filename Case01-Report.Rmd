@@ -1,6 +1,6 @@
 ---
-title: "Case01-Report"
-author: "Jingxuan Liu, Linda Tang, Justin Zhao, Mary Wang, Abbey List, and Jack Lichtenstein"
+title: "Case Report"
+author: "Jack Lichtenstein, Abbey List, Jingxuan Liu, Linda Tang, Mary Wang, and Justin Zhao"
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
@@ -23,9 +23,17 @@ train <- read.csv(here("data", "data-train.csv"))
 test <- read.csv(here("data", "data-test.csv"))
 ```
 
-## Introduction 
+## 1 Introduction 
 
-## Methods
+TTurbulence is a fundamental concept in fluid mechanics. Understanding how fluids move has enormous importance to a vast range of problems, with practical applications in aeronautical engineering, environmental science, astronomy, and more. In contrast to laminar flow, turbulent flow is irregular, unpredictable, and energy-dissipating. Turbulence enhances mixing which leads to non-uniform distribution of particles and cluster formation. In general, the final state of particles subject to turbulent flow is determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number. The Reynolds number is a measure of the intensity of turbulence, with a higher Reynolds number corresponding to a higher intensity of turbulence (J. den Toonder et al., 1997). Broadly speaking, a Reynolds number > 4000 generally represents a relatively chaotic and turbulent flow, a Reynolds number < 2300 generally represents a smooth laminar flow and any number in between typically represents transient flow (Schlichting et al., 2017). The Froude number is a measure of the impact of gravitational acceleration on fluid motion. For instance, a cumulonimbus cloud at a high level above the ground will have a smaller Froude number (compared to lower hanging stratus clouds) because it experiences a lower intensity of gravitational acceleration relative to other clouds (Chanson, 2009). Stokes number is a description of particle properties; a large Stokes number correlates with large particle size which tends to form relatively loose clusters (Ireland et al., 2016). 
+
+Despite the importance of turbulence and particle clustering, we do not understand this process well very. Researchers has primarily used Direct Numerical Simulation (DNS) of Navier-Stokes equations to study this problem, but it is extremely time consuming and computationally expensive (Moin & Mahesh, 1998). In addition, the DNS method cannot be practically applied to simulate flows with large Reynolds numbers which requires high resolution, leading to long computation time. However, large Reynolds numbers is highly relevant to real life situations (atmospheric, oceanic turbulence flow). Thus, the primary research **objective** of this study is to build a statistical model to investigate how Reynolds (Re) number, Froude (Fr) number and Stokes (St) number influence particle cluster volume distribution and allows prediction without the need for simulation. 
+
+The data for this study comes from Direct Numerical Simulation using a range of parameters. Then, Voronoi Tessellation, a technique that looks at general features of individual clusters in the underlying turbulence, has been applied to generate a distribution of cluster volumes. Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$ and partition our focus into four new response variables. We plan to use each of the four moments as responses variables and the parameters as predictors. Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate. We hope that our research model will enable a quick and efficient prediction of a particle cluster volume distribution and enhance our understanding of the relative influence of these parameters in turbulent flow.
+
+## 2 Methods
+
+### 2.1 EDA
 
 Before we begin any analysis, let's further split our training data into a smaller train and test set. We also create cross-validation folds with $K=5$. We do this in an effort to reduce the likelihood of overfitting to the full training data.
 
@@ -41,18 +49,8 @@ set.seed(234)
 folds <- rsample::vfold_cv(tr, v = 5)
 ```
 
-Below we visualize a histogram of the three numerical predictors in these data, `Fr`, `Re`, and `St`. We notice that while the predictors `Fr` and `Re` seem continuous, they are more like factor levels than numeric. As such, we convert both variables to factors.
-
-```{r hist pred, echo=FALSE}
-# histograms of predictors
-tr %>%
-  pivot_longer(cols = c(St:Fr),
-               names_to = "metric",
-               values_to = "value") %>%
-  ggplot(aes(value)) +
-  geom_histogram() +
-  facet_wrap(~ metric, scales = "free")
-```
+While Fr and Re consists of continuous values in real life, a brief examination of our training data reveals that both two variables contain only three levels (Appendix). As such, we convert both variables to factors. 
+Fr can take on value inf, 0.3, 0.052, Re can be 90, 224, 398, and St is continuous beteen 0-3. *Rationale for using categorical Fr*: Simulation were done on 3 difference levels of Fr (inf, 0.3, 0.052). 0.3 represents cumulonimbus clouds, 0.052 represents cumulus clouds. The stronger gravity, the larger the Fr. We will also build a separate model to model continuous Fr and Re (allow for extrapolation). 
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -60,9 +58,19 @@ train <- train %>%
   mutate(across(c(Fr, Re), factor))
 ```
 
-Below, we plot the relationship between the three predictor variables and each of the four response variables. Note, the curves fit to the points are via local polynomial regression.
+Below, we plot the relationship between the three predictor variables and each of the four response variables (Figure 1 contains graphs for Moment 1. For plots relating to Moments 2-4, please refer to Figures XX-XX in the Appendix). Note, the curves fit to the points are via local polynomial regression.
 
-```{r eda plots, echo=FALSE}
+```{r Figure-1, fig.cap = "Moment 1 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_1, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 1", color = "Fr:Re")
+```
+
+
+```{r eda plots, echo=FALSE, eval=FALSE}
 tr_long <- tr %>%
   pivot_longer(cols = starts_with("R_moment"),
                names_to = "moment",
@@ -186,8 +194,64 @@ cv_summarized %>%
 
 ## Results
 
+Model Output:
+
 ## Discussion
+
+\newpage
 
 ## References
 
+- J. M. J.  den Toonder, &amp; Nieuwstadt, F. T. M. (1997, November 1). Reynolds number effects in a turbulent pipe flow for low to moderate re. AIP Publishing. Retrieved October 12, 2021, from https://aip.scitation.org/doi/pdf/10.1063/1.869451. 
+
+- Schlichting, H., Gersten, K., Krause, E., &amp; Oertel, H. (2017). Boundary-layer theory. Springer. 
+
+- Chanson, Hubert (2009). "Development of the Bélanger Equation and Backwater Equation by Jean-Baptiste Bélanger (1828)" (PDF). Journal of Hydraulic Engineering. 135 (3): 159–63. doi:10.1061/(ASCE)0733-9429(2009)135:3(159).
+
+- Ireland, P. J., Bragg, A. D., &amp; Collins, L. R. (2016, May 11). The effect of Reynolds number on inertial particle dynamics in isotropic turbulence. part&nbsp;2. simulations with gravitational effects: Journal of Fluid Mechanics. Cambridge Core. Retrieved October 12, 2021, from https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/effect-of-reynolds-number-on-inertial-particle-dynamics-in-isotropic-turbulence-part-2-simulations-with-gravitational-effects/67C55CDC28B1B1C7868B7A402E279AF9. 
+
+- Moin, P., &amp; Mahesh, K. (n.d.). Direct numerical simulation: A tool in turbulence research. Annual Reviews. Retrieved October 12, 2021, from https://www.annualreviews.org/doi/full/10.1146/annurev.fluid.30.1.539. 
+
+- slides: https://sakai.duke.edu/access/content/group/e1e1b166-17bd-4efc-bdfb-f3909d696910/Case%20Study/Data_Expedition_F2020_Reza_Jon.pdf
+
+\newpage
+
 ## Appendix 
+
+```{r hist pred, fig.height = 3, fig.width=8}
+# histograms of predictors
+tr %>%
+  pivot_longer(cols = c(St:Fr),
+               names_to = "metric",
+               values_to = "value") %>%
+  ggplot(aes(value)) +
+  geom_bar() +
+  facet_wrap(~ metric, scales = "free")
+```
+
+```{r Figure-S1, fig.cap = "Moment 2 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_2, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 2", color = "Fr:Re")
+```
+
+```{r Figure-S2, fig.cap = "Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_3, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 3", color = "Fr:Re")
+```
+
+```{r Figure-S3, fig.cap = "Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
+train %>%
+  ggplot(aes(x = St, y = R_moment_4, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 4", color = "Fr:Re")
+```
