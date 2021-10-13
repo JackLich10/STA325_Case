@@ -15,12 +15,23 @@ knitr::opts_chunk$set(echo = F, message = F, warning=F)
 ```{r load-library}
 library(tidyverse)
 library(here)
+library(splines)
 theme_set(theme_light()) # setting a theme
 ```
 
 ```{r load-data}
-train <- read.csv(here("data", "data-train.csv"))
-test <- read.csv(here("data", "data-test.csv"))
+# remember to set working directory
+train <- read.csv("data/data-train.csv")
+test <- read.csv("data/data-test.csv")
+```
+
+```{r setup-moments}
+train <- train %>%
+  mutate(
+    central_1 = R_moment_1, #mean
+    central_2 = R_moment_2 - R_moment_1^2, #var
+    central_3 = (R_moment_3 - 3*R_moment_2*R_moment_1 + 2*R_moment_1^3), #skew
+    central_4 = (R_moment_4 - 4*R_moment_3*R_moment_1 + 6*R_moment_2*R_moment_1^2 - 3*R_moment_1^4)) #kurtosis
 ```
 
 ## 1 Introduction 
@@ -29,13 +40,30 @@ Turbulence is a fundamental concept in fluid mechanics. Understanding how fluids
 
 Despite the importance of turbulence and particle clustering, we do not understand this process well very. Researchers has primarily used Direct Numerical Simulation (DNS) of Navier-Stokes equations to study this problem, but it is extremely time consuming and computationally expensive (Moin & Mahesh, 1998). In addition, the DNS method cannot be practically applied to simulate flows with large Reynolds numbers which requires high resolution, leading to long computation time. However, large Reynolds numbers is highly relevant to real life situations (atmospheric, oceanic turbulence flow). Thus, the primary research **objective** of this study is to build a statistical model to investigate how Reynolds (Re) number, Froude (Fr) number and Stokes (St) number influence particle cluster volume distribution and allows prediction without the need for simulation. 
 
-The data for this study comes from Direct Numerical Simulation using a range of parameters. Then, Voronoi Tessellation, a technique that looks at general features of individual clusters in the underlying turbulence, has been applied to generate a distribution of cluster volumes. Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$ and partition our focus into four new response variables. We plan to use each of the four moments as responses variables and the parameters as predictors. Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate. We hope that our research model will enable a quick and efficient prediction of a particle cluster volume distribution and enhance our understanding of the relative influence of these parameters in turbulent flow.
+The data for this study comes from Direct Numerical Simulation using a range of parameters. Then, Voronoi Tessellation, a technique that looks at general features of individual clusters in the underlying turbulence, has been applied to generate a distribution of cluster volumes. Since this probability distribution of cluster volumes is harder for statistical learning methods to work with, we will summarize this distribution by its first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, the latter three which we transform to central moments as response variables for inference and back for prediction. Theoretically, we are interested in the insights for each of these four moments - the mean of the distribution could be a good indicator of how flow behaves on average, the variance of the distribution could dictate how flow varies over time, the skew of the distribution could illustrate asymmetric properties of the flow, and the kurtosis of the distribution could indicate how particular cluster volumes deviate. We hope that our research model will enable a quick and efficient prediction of a particle cluster volume distribution and enhance our understanding of the relative influence of these parameters in turbulent flow.
 
 ## 2 Methods
 
-### 2.1 EDA
+### 2.1 Model
 
-Before we begin any analysis, let's further split our training data into a smaller train and test set. We also create cross-validation folds with $K=5$. We do this in an effort to reduce the likelihood of overfitting to the full training data.
+The forms of the statistical models, one for each moment, are:
+$$R\_moment_1 \sim Fr + Re + St*(Fr, Re)$$
+$$central_2 \sim Fr + Re + poly(St^{1/4}, 2) * (Fr, Re)$$
+$$central_3 \sim Fr + Re + poly(St^{1/3}, 2) * (Fr, Re)$$
+$$central_4 \sim Fr + Re + poly(\sqrt{St}, 2) * (Fr, Re)$$
+
+where $Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$ are categorical variables and $(Fr, Re)$ is an interaction term with 9 levels representing all combinations of $Fr$ and $Re$. For the fitted coefficients, see the results section.
+
+### 2.2 Justification
+
+While $Fr$ and $Re$ are continuous values in physics, both variables contain only three levels in our training and test data (Appendix). Since we see from the test data that we are specifically interested in these levels, we treat both as categorical variables in modeling. For $Fr$ in particular, 0.3 represents cumulonimbus clouds and 0.052 represents cumulus clouds. See 2.4 for a separate model set that addresses these limitations. 
+
+```{r factors, echo=FALSE}
+# make Fr, Re factors
+train <- train %>%
+  mutate(Fr.numeric = 2/pi*atan(Fr), Re.numeric = Re) %>%
+  dplyr::mutate(dplyr::across(c(Fr, Re), factor))
+```
 
 ```{r cv folds}
 # split into train and test
@@ -48,59 +76,13 @@ set.seed(234)
 folds <- rsample::vfold_cv(tr, v = 5)
 ```
 
-While Fr and Re consists of continuous values in real life, a brief examination of our training data reveals that both two variables contain only three levels (Appendix). As such, we convert both variables to factors. 
-Fr can take on value inf, 0.3, 0.052, Re can be 90, 224, 398, and St is continuous beteen 0-3. *Rationale for using categorical Fr*: Simulation were done on 3 difference levels of Fr (inf, 0.3, 0.052). 0.3 represents cumulonimbus clouds, 0.052 represents cumulus clouds. The stronger gravity, the larger the Fr. We will also build a separate model to model continuous Fr and Re (allow for extrapolation). 
+For other key properties, the three-way interaction between the predictors arises from exploratory data analysis where the relationship between $St$ and each moment appears highly influenced by the combined levels of $Re$ and $Fr$ (refer to Figures S1-S4 in the Appendix). In particular, this relationship varies between roughly linear to noticeably curved, potentially quadratic or cubic, and appears to be very strong. Additionally, we notice from the curved shape of the relationship between `St` and the response that we may benefit from taking certain roots of `St` to make that more linear.
 
-```{r factors, echo=FALSE}
-# make Fr, Re factors
-train <- train %>%
-  dplyr::mutate(dplyr::across(c(Fr, Re), factor))
-```
+### 2.2 Fitting Process
 
-Below, we plot the relationship between the three predictor variables and each of the four response variables (Figure 1 contains graphs for Moment 1. For plots relating to Moments 2-4, please refer to Figures XX-XX in the Appendix). Note, the curves fit to the points are via local polynomial regression.
+We used K-fold cross validation with $K=5$ to choose the model features, exploring linear regression and then nonlinear extensions into polynomial terms and interactions based on the EDA above. Since we only have 89 training observation, we do this in an effort to reduce the likelihood of overfitting.
 
-```{r Figure-1, fig.cap = "Moment 1 values as a function of particle size at different levels of interaction between Fr and Re."}
-tr %>%
-  ggplot(aes(x = St, y = R_moment_1, color = interaction(Fr, Re))) +
-  geom_point() +
-  geom_smooth() +
-  facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "Particle Size", y = "Moment 1", color = "Fr:Re")
-```
-
-
-```{r eda plots, echo=FALSE, eval=FALSE}
-tr_long <- tr %>%
-  tidyr::pivot_longer(cols = starts_with("R_moment"),
-               names_to = "moment",
-               names_prefix = "R_moment_",
-               values_to = "value") 
-# plot St vs. R_moment_*, color by interaction between Fr, Re
-tr_long %>%
-  ggplot(aes(St, value, color = interaction(Fr, Re))) +
-  geom_point() +
-  geom_smooth() +
-  facet_wrap(~ moment, scales = "free", labeller = label_both)
-plot_moment <- function(mt) {
-  tr_long %>%
-    dplyr::filter(moment == mt) %>%
-    ggplot(aes(St, value)) +
-    geom_point() +
-    geom_smooth() +
-    facet_wrap(~ interaction(Fr, Re), scales = "free") +
-    labs(title = paste0("Moment: ", mt))
-}
-cowplot::plot_grid(plot_moment("1"), plot_moment("2"), 
-                   nrow = 1, ncol = 2)
-cowplot::plot_grid(plot_moment("3"), plot_moment("4"), 
-                   nrow = 1, ncol = 2)
-```
-
-In general, these seem to be very strong relationships. We also notice that the interaction between `Fr` and `Re` seems to explain a lot of the variance in the response. That is, the relationship between the third variable `St` and the response depends a lot on the specific interaction between `Fr` and `Re`. We will very likely need to include this interaction in any model we build for these data. 
-
-Additionally, we notice that the relationship between `St` and the response may benefit from taking the square root of `St`.
-
-Below, we perform cross validation of a number of candidate models for each moment. Specifically, for each moment, we train a model to predict the moment with the general formula `~ poly(St, degree)*interaction` where `interaction` is the factor interaction between `Fr` and `Re`. We vary the `degree` parameter from 1 to 3. Additionally, we may choose to take the square root of `St` or take the log of the response.
+Specifically, for each moment, we train candidate models to predict the moment with the general formula `~ poly(St^(1/root), degree)*(Fr, Re)` and vary the `degree` parameter from 1 to 3 and `root` from 1 to 6. Additionally, we may choose to take the log of the response. We then look at the estimated test errors and choose the parameters that give lower errors, with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares.
 
 ```{r cv lm, echo=FALSE}
 # function to train on a given fold, using given degree, predicting given moment
@@ -124,7 +106,6 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
   }
   mod <- data %>%
     lm(target ~ poly(St, degree)*interaction, data = .)
-  train_adj_r2 <- broom::glance(mod)$adj.r.squared
   assess <- assess %>%
     dplyr::mutate(pred = predict(mod, ., type = "response") %>% as.numeric())
   if (isTRUE(log)) {
@@ -181,13 +162,25 @@ cv_summarized %>%
   kableExtra::kable(format = "markdown")
 ```
 
+### 2.4 Model Extension
+
+As noted above, extrapolating beyond the three levels of $Re$ and three levels of $Fr$ given may be useful for more general predictions and interpretation, since the actual variables have wide domains (@Jing how to word this). To deal with the limitations of our current models, we also provide the following related models that can be used for extrapolation: 
+
+$$R\_moment_1 \sim ns(St, df=1)*Re*Fr'$$
+$$R\_moment_2, R\_moment_3, R\_moment_3 \sim ns(\sqrt{St}, df=1)*Re*Fr'$$
+In these models, $Re$ is numeric and $Fr$ is transformed to a numeric variable on $[0, 1]$ using $Fr' = \frac{2}{\pi}*arctan(Fr)$. The form is similar in keeping the significant three-way interaction, except with natural splines to address the poor fits of polynomials at the tails, a location that is especially important in learning about particle behavior in high turbulence. Again, the root and degree are chosen through 5-fold cross validation. See appendix for fitted coefficients.
+
+## Results
+
+Model Output:
+
 ```{r}
 # potential outlers: 82 / 80, 85
 model1 <- train %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(R_moment_1 ~ poly(St, 1)*interaction, data = .)
+  lm(central_1 ~ as.factor(Fr) + as.factor(Re) + poly(St, 1)*interaction, data = .)
 summary(model1)
-plot(model1)
+#plot(model1)
 ```
 
 ```{r}
@@ -195,9 +188,9 @@ plot(model1)
 model2 <- train %>%
   mutate(St = St^(1/4)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(R_moment_2 ~ poly(St, 2)*interaction, data = .)
+  lm(central_2 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2)*interaction, data = .)
 summary(model2)
-plot(model2)
+#plot(model2)
 ```
 
 ```{r}
@@ -205,9 +198,9 @@ plot(model2)
 model3 <- train %>%
   mutate(St = St^(1/3)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(R_moment_3 ~ factor(Fr) + St + Re + as.factor(Fr)*St + Re*St + poly(St, 2)*interaction, data = .)
+  lm(central_3 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2)*interaction, data = .)
 summary(model3)
-plot(model3)
+#plot(model3)
 ```
 
 ```{r}
@@ -215,14 +208,10 @@ plot(model3)
 model4 <- train %>%
   mutate(St = sqrt(St)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(R_moment_4 ~ poly(St, 2)*interaction, data = .)
+  lm(central_4 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2)*interaction, data = .)
 summary(model4)
-plot(model4)
+#plot(model4)
 ```
-
-## Results
-
-Model Output:
 
 ## Discussion
 
@@ -249,15 +238,51 @@ Model Output:
 ```{r hist pred, fig.height = 3, fig.width=8}
 # histograms of predictors
 tr %>%
-  pivot_longer(cols = c(St:Fr),
+  pivot_longer(cols = c(Re:Fr),
                names_to = "metric",
                values_to = "value") %>%
   ggplot(aes(value)) +
-  geom_histogram(bins = 20) +
+  geom_histogram(bins = 20, stat="count") +
   facet_wrap(~ metric, scales = "free")
 ```
 
-```{r Figure-S1, fig.cap = "Moment 2 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r eda plots, echo=FALSE, eval=FALSE}
+tr_long <- tr %>%
+  tidyr::pivot_longer(cols = starts_with("R_moment"),
+               names_to = "moment",
+               names_prefix = "R_moment_",
+               values_to = "value") 
+# plot St vs. R_moment_*, color by interaction between Fr, Re
+tr_long %>%
+  ggplot(aes(St, value, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ moment, scales = "free", labeller = label_both)
+plot_moment <- function(mt) {
+  tr_long %>%
+    dplyr::filter(moment == mt) %>%
+    ggplot(aes(St, value)) +
+    geom_point() +
+    geom_smooth() +
+    facet_wrap(~ interaction(Fr, Re), scales = "free") +
+    labs(title = paste0("Moment: ", mt))
+}
+cowplot::plot_grid(plot_moment("1"), plot_moment("2"), 
+                   nrow = 1, ncol = 2)
+cowplot::plot_grid(plot_moment("3"), plot_moment("4"), 
+                   nrow = 1, ncol = 2)
+```
+
+```{r Figure-S1, fig.cap = "Moment 1 values as a function of particle size at different levels of interaction between Fr and Re."}
+tr %>%
+  ggplot(aes(x = St, y = R_moment_1, color = interaction(Fr, Re))) +
+  geom_point() +
+  geom_smooth() +
+  facet_wrap(~ interaction(Fr, Re), scales = "free") +
+  labs(x = "Particle Size", y = "Moment 1", color = "Fr:Re")
+```
+
+```{r Figure-S2, fig.cap = "Moment 2 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
   ggplot(aes(x = St, y = R_moment_2, color = interaction(Fr, Re))) +
   geom_point() +
@@ -266,7 +291,7 @@ train %>%
   labs(x = "Particle Size", y = "Moment 2", color = "Fr:Re")
 ```
 
-```{r Figure-S2, fig.cap = "Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r Figure-S3, fig.cap = "Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
   ggplot(aes(x = St, y = R_moment_3, color = interaction(Fr, Re))) +
   geom_point() +
@@ -275,11 +300,32 @@ train %>%
   labs(x = "Particle Size", y = "Moment 3", color = "Fr:Re")
 ```
 
-```{r Figure-S3, fig.cap = "Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r Figure-S4, fig.cap = "Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
   ggplot(aes(x = St, y = R_moment_4, color = interaction(Fr, Re))) +
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
   labs(x = "Particle Size", y = "Moment 4", color = "Fr:Re")
+```
+
+```{r}
+# Note: don't perform as well because splines tend to require more data to fit + extrapolation means more uncertainty generally
+model1 <- train %>%
+  lm(R_moment_1 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+summary(model1)
+
+model2 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  lm(R_moment_2 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+
+model3 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  lm(R_moment_3 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+summary(model3)
+
+model4 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  lm(R_moment_4 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+summary(model4)
 ```
