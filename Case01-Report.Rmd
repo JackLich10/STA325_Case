@@ -25,7 +25,7 @@ test <- read.csv(here("data", "data-test.csv"))
 
 ## 1 Introduction 
 
-TTurbulence is a fundamental concept in fluid mechanics. Understanding how fluids move has enormous importance to a vast range of problems, with practical applications in aeronautical engineering, environmental science, astronomy, and more. In contrast to laminar flow, turbulent flow is irregular, unpredictable, and energy-dissipating. Turbulence enhances mixing which leads to non-uniform distribution of particles and cluster formation. In general, the final state of particles subject to turbulent flow is determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number. The Reynolds number is a measure of the intensity of turbulence, with a higher Reynolds number corresponding to a higher intensity of turbulence (J. den Toonder et al., 1997). Broadly speaking, a Reynolds number > 4000 generally represents a relatively chaotic and turbulent flow, a Reynolds number < 2300 generally represents a smooth laminar flow and any number in between typically represents transient flow (Schlichting et al., 2017). The Froude number is a measure of the impact of gravitational acceleration on fluid motion. For instance, a cumulonimbus cloud at a high level above the ground will have a smaller Froude number (compared to lower hanging stratus clouds) because it experiences a lower intensity of gravitational acceleration relative to other clouds (Chanson, 2009). Stokes number is a description of particle properties; a large Stokes number correlates with large particle size which tends to form relatively loose clusters (Ireland et al., 2016). 
+Turbulence is a fundamental concept in fluid mechanics. Understanding how fluids move has enormous importance to a vast range of problems, with practical applications in aeronautical engineering, environmental science, astronomy, and more. In contrast to laminar flow, turbulent flow is irregular, unpredictable, and energy-dissipating. Turbulence enhances mixing which leads to non-uniform distribution of particles and cluster formation. In general, the final state of particles subject to turbulent flow is determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number. The Reynolds number is a measure of the intensity of turbulence, with a higher Reynolds number corresponding to a higher intensity of turbulence (J. den Toonder et al., 1997). Broadly speaking, a Reynolds number > 4000 generally represents a relatively chaotic and turbulent flow, a Reynolds number < 2300 generally represents a smooth laminar flow and any number in between typically represents transient flow (Schlichting et al., 2017). The Froude number is a measure of the impact of gravitational acceleration on fluid motion. For instance, a cumulonimbus cloud at a high level above the ground will have a smaller Froude number (compared to lower hanging stratus clouds) because it experiences a lower intensity of gravitational acceleration relative to other clouds (Chanson, 2009). Stokes number is a description of particle properties; a large Stokes number correlates with large particle size which tends to form relatively loose clusters (Ireland et al., 2016). 
 
 Despite the importance of turbulence and particle clustering, we do not understand this process well very. Researchers has primarily used Direct Numerical Simulation (DNS) of Navier-Stokes equations to study this problem, but it is extremely time consuming and computationally expensive (Moin & Mahesh, 1998). In addition, the DNS method cannot be practically applied to simulate flows with large Reynolds numbers which requires high resolution, leading to long computation time. However, large Reynolds numbers is highly relevant to real life situations (atmospheric, oceanic turbulence flow). Thus, the primary research **objective** of this study is to build a statistical model to investigate how Reynolds (Re) number, Froude (Fr) number and Stokes (St) number influence particle cluster volume distribution and allows prediction without the need for simulation. 
 
@@ -55,13 +55,13 @@ Fr can take on value inf, 0.3, 0.052, Re can be 90, 224, 398, and St is continuo
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
 train <- train %>%
-  mutate(across(c(Fr, Re), factor))
+  dplyr::mutate(dplyr::across(c(Fr, Re), factor))
 ```
 
 Below, we plot the relationship between the three predictor variables and each of the four response variables (Figure 1 contains graphs for Moment 1. For plots relating to Moments 2-4, please refer to Figures XX-XX in the Appendix). Note, the curves fit to the points are via local polynomial regression.
 
 ```{r Figure-1, fig.cap = "Moment 1 values as a function of particle size at different levels of interaction between Fr and Re."}
-train %>%
+tr %>%
   ggplot(aes(x = St, y = R_moment_1, color = interaction(Fr, Re))) +
   geom_point() +
   geom_smooth() +
@@ -72,7 +72,7 @@ train %>%
 
 ```{r eda plots, echo=FALSE, eval=FALSE}
 tr_long <- tr %>%
-  pivot_longer(cols = starts_with("R_moment"),
+  tidyr::pivot_longer(cols = starts_with("R_moment"),
                names_to = "moment",
                names_prefix = "R_moment_",
                values_to = "value") 
@@ -86,7 +86,7 @@ tr_long %>%
 
 plot_moment <- function(mt) {
   tr_long %>%
-    filter(moment == mt) %>%
+    dplyr::filter(moment == mt) %>%
     ggplot(aes(St, value)) +
     geom_point() +
     geom_smooth() +
@@ -170,7 +170,7 @@ cv_summarized <- cv %>%
                    .groups = "drop")
 
 cv_summarized %>% 
-  filter(!(log == TRUE & degree == 3)) %>% 
+  dplyr::filter(!(log == TRUE & degree == 3)) %>% 
   dplyr::mutate(moment = paste0("Moment: ", moment)) %>%
   tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>%
   tidyr::unite(type, moment, name, sep = ": ", remove = FALSE) %>%
@@ -182,13 +182,13 @@ cv_summarized %>%
 
 ```{r cv results, echo=FALSE}
 cv_summarized %>% 
-  pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>% 
-  group_by(moment, name) %>% 
-  mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
-  ungroup() %>% 
-  filter(value == best) %>% 
-  select(moment, degree, sqrt, log, name, value) %>% 
-  mutate(value = scales::comma(value, accuracy = 0.00001)) %>% 
+  tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>% 
+  dplyr::group_by(moment, name) %>% 
+  dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::filter(value == best) %>% 
+  dplyr::select(moment, degree, sqrt, log, name, value) %>% 
+  dplyr::mutate(value = scales::comma(value, accuracy = 0.00001)) %>% 
   kableExtra::kable(format = "markdown")
 ```
 
@@ -225,7 +225,7 @@ tr %>%
                names_to = "metric",
                values_to = "value") %>%
   ggplot(aes(value)) +
-  geom_bar() +
+  geom_histogram(bins = 20) +
   facet_wrap(~ metric, scales = "free")
 ```
 
