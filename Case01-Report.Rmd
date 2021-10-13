@@ -47,10 +47,10 @@ The data for this study comes from Direct Numerical Simulation using a range of 
 ### 2.1 Model
 
 The forms of the statistical models, one for each moment, are:
-$$R\_moment_1 \sim Fr + Re + St*(Fr, Re)$$
-$$central_2 \sim Fr + Re + poly(St^{1/4}, 2) * (Fr, Re)$$
-$$central_3 \sim Fr + Re + poly(St^{1/3}, 2) * (Fr, Re)$$
-$$central_4 \sim Fr + Re + poly(\sqrt{St}, 2) * (Fr, Re)$$
+$$R\_moment_1 \sim St*(Fr, Re)$$
+$$central_2 \sim poly(St^{1/4}, 2) * (Fr, Re)$$
+$$central_3 \sim poly(St^{1/3}, 2) * (Fr, Re)$$
+$$central_4 \sim poly(\sqrt{St}, 2) * (Fr, Re)$$
 
 where $Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$ are categorical variables and $(Fr, Re)$ is an interaction term with 9 levels representing all combinations of $Fr$ and $Re$. For the fitted coefficients, see the results section.
 
@@ -68,6 +68,7 @@ train <- train %>%
 ```{r cv folds}
 # split into train and test
 set.seed(123)
+train$index <- 1:nrow(train)
 spl <- rsample::initial_split(train, prop = 0.8)
 tr <- rsample::training(spl)
 te <- rsample::testing(spl)
@@ -82,32 +83,34 @@ For other key properties, the three-way interaction between the predictors arise
 
 We used K-fold cross validation with $K=5$ to choose the model features, exploring linear regression and then nonlinear extensions into polynomial terms and interactions based on the EDA above. Since we only have 89 training observation, we do this in an effort to reduce the likelihood of overfitting.
 
-Specifically, for each moment, we train candidate models to predict the moment with the general formula `~ poly(St^(1/root), degree)*(Fr, Re)` and vary the `degree` parameter from 1 to 3 and `root` from 1 to 6. Additionally, we may choose to take the log of the response. We then look at the estimated test errors and choose the parameters that give lower errors, with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares.
+Specifically, for each moment, we train candidate models to predict the moment with the general formula `~ poly(St^(1/root), degree)*(Fr, Re)`, varying the `degree` parameter from 1 to 3, varyind `root` from 1 to 6, and testing a log transformation of the response. We then look at the estimated test errors (see Figure x) and chose the parameters that give lower errors, with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares. (@Jing where to mention diagnostics)
 
 ```{r cv lm, echo=FALSE}
 # function to train on a given fold, using given degree, predicting given moment
-lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
+lm_cv <- function(fold, degree, moment, root = 2, log = TRUE) {
   data <- rsample::analysis(folds$splits[[fold]]) %>%
-    dplyr::mutate(target = !!dplyr::sym(paste0("R_moment_", moment))) %>% 
+    dplyr::mutate(target = !!dplyr::sym(paste0("central_", moment))) %>% 
     tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE)
   assess <- rsample::assessment(folds$splits[[fold]]) %>%
-    dplyr::mutate(target = !!dplyr::sym(paste0("R_moment_", moment))) %>% 
+    dplyr::mutate(target = !!dplyr::sym(paste0("central_", moment))) %>% 
     tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE)
-  if (isTRUE(sqrt)) {
-    data <- data %>%
-      dplyr::mutate(St = sqrt(St))
-    assess <- assess %>%
-      dplyr::mutate(St = sqrt(St))
-  }
+  
+  data <- data %>%
+    dplyr::mutate(St = St^(1/root))
+  assess <- assess %>%
+    dplyr::mutate(St = St^(1/root))
+  
   if (isTRUE(log)) {
     data <- data %>%
       dplyr::mutate(target = log(target))
     assess <- assess
   }
+  
   mod <- data %>%
     lm(target ~ poly(St, degree)*interaction, data = .)
   assess <- assess %>%
     dplyr::mutate(pred = predict(mod, ., type = "response") %>% as.numeric())
+  
   if (isTRUE(log)) {
     assess <- assess %>%
       dplyr::mutate(pred = exp(pred))
@@ -121,45 +124,49 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
 cv <- tidyr::crossing(fold = 1:5,
                       degree = 1:3,
                       moment = 1:4,
-                      sqrt = c(TRUE, FALSE),
-                      log = c(TRUE, FALSE)) %>%
-  dplyr::mutate(cv = purrr::pmap(list(fold, degree, moment, sqrt, log),
+                      root = 1:6,
+                      log = c(FALSE)) %>%
+  dplyr::mutate(cv = purrr::pmap(list(fold, degree, moment, root, log),
                                  ~ lm_cv(fold = ..1,
                                          degree = ..2,
                                          moment = ..3,
-                                         sqrt = ..4,
+                                         root = ..4,
                                          log = ..5))) %>%
   tidyr::unnest(cv)
 ```
 
 ```{r, echo=FALSE}
+# undo central
+cv_wide <- cv %>%
+    dplyr::group_by(index, fold, degree, root, log) %>%
+    summarise(moment, pred)
+  cv_wide <- cv_wide %>%
+    reshape2::dcast(index + fold + degree + root + log ~ moment, value.var="pred")
+  
+  for (i in 1:nrow(cv_wide)) {
+      cv_wide[i, "2"] = cv_wide[i, "2"] + cv_wide[i, "1"]^2
+      cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["root"] == cv_wide[i, "root"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["moment"] == 2), "pred"] = cv_wide[i, "2"] 
+      cv_wide[i, "3"] = cv_wide[i, "3"] - 2*cv_wide[i, "1"]^3 + 3*cv_wide[i, "2"]*cv_wide[i, "1"]
+      cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["root"] == cv_wide[i, "root"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["moment"] == 3), "pred"] = cv_wide[i, "3"]
+      cv_wide[i, "4"] = cv_wide[i, "4"] + 3*cv_wide[i, "1"]^4 - 6*cv_wide[i, "2"]*cv_wide[i, "1"]^2 + 4*cv_wide[i, "3"]*cv_wide[i, "1"]
+      cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["root"] == cv_wide[i, "root"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["moment"] == 4), "pred"] = cv_wide[i, "4"]
+  }
+  
 cv_summarized <- cv %>%
-  dplyr::group_by(moment = factor(moment), degree, sqrt, log) %>%
+  dplyr::group_by(moment = factor(moment), degree, root, log) %>%
   dplyr::summarise(rmse = sqrt(mean((pred-target)^2)),
                    mae = mean(abs(pred-target)),
                    broom::glance(lm(target ~ pred, data = dplyr::cur_data())),
                    .groups = "drop")
 cv_summarized %>% 
-  dplyr::filter(!(log == TRUE & degree == 3)) %>% 
+  dplyr::filter(!(log)) %>% 
   dplyr::mutate(moment = paste0("Moment: ", moment)) %>%
   tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>%
   tidyr::unite(type, moment, name, sep = ": ", remove = FALSE) %>%
-  ggplot(aes(degree, value, color = sqrt, lty = log)) +
+  ggplot(aes(root, value, color = as.factor(degree))) +
   geom_line() +
   geom_point() +
   facet_wrap(~ type, scales = "free", nrow = 4)
-```
-
-```{r cv results, echo=FALSE}
-cv_summarized %>% 
-  tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>% 
-  dplyr::group_by(moment, name) %>% 
-  dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
-  dplyr::ungroup() %>% 
-  dplyr::filter(value == best) %>% 
-  dplyr::select(moment, degree, sqrt, log, name, value) %>% 
-  dplyr::mutate(value = scales::comma(value, accuracy = 0.00001)) %>% 
-  kableExtra::kable(format = "markdown")
 ```
 
 ### 2.4 Model Extension
@@ -178,7 +185,7 @@ Model Output:
 # potential outlers: 82 / 80, 85
 model1 <- train %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(central_1 ~ as.factor(Fr) + as.factor(Re) + poly(St, 1)*interaction, data = .)
+  lm(central_1 ~ poly(St, 1)*interaction, data = .)
 summary(model1)
 #plot(model1)
 ```
@@ -188,7 +195,7 @@ summary(model1)
 model2 <- train %>%
   mutate(St = St^(1/4)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(central_2 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2)*interaction, data = .)
+  lm(central_2 ~ poly(St, 2)*interaction, data = .)
 summary(model2)
 #plot(model2)
 ```
@@ -198,7 +205,7 @@ summary(model2)
 model3 <- train %>%
   mutate(St = St^(1/3)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(central_3 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2)*interaction, data = .)
+  lm(central_3 ~ poly(St, 2)*interaction, data = .)
 summary(model3)
 #plot(model3)
 ```
@@ -208,9 +215,35 @@ summary(model3)
 model4 <- train %>%
   mutate(St = sqrt(St)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
-  lm(central_4 ~ as.factor(Fr) + as.factor(Re) + poly(St, 2)*interaction, data = .)
+  lm(central_4 ~ poly(St, 2)*interaction, data = .)
 summary(model4)
 #plot(model4)
+```
+
+```{r}
+test$R_moment_1 = test %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  predict(model1, ., type = "response")
+test$R_moment_2 = test %>%
+  mutate(St = St^(1/4)) %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  predict(model2, ., type = "response")
+test$R_moment_3 = test %>%
+  mutate(St = St^(1/3)) %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  predict(model3, ., type = "response")
+test$R_moment_4 = test %>%
+  mutate(St = sqrt(St)) %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  predict(model4, ., type = "response")
+
+for (i in 1:nrow(test)) {
+      test[i, "R_moment_2"] = test[i, "R_moment_2"] + test[i, "R_moment_1"]^2
+      test[i, "R_moment_3"] = test[i, "R_moment_3"] - 2*test[i, "R_moment_1"]^3 + 3*test[i, "R_moment_2"]*test[i, "R_moment_1"]
+      test[i, "R_moment_4"] = test[i, "R_moment_4"] + 3*test[i, "R_moment_1"]^4 - 6*test[i, "R_moment_2"]*test[i, "R_moment_1"]^2 + 4*test[i, "R_moment_3"]*test[i, "R_moment_1"]
+}
+
+write.csv(test, file="data/data-test_pred.csv")
 ```
 
 ## Discussion
@@ -307,6 +340,18 @@ train %>%
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
   labs(x = "Particle Size", y = "Moment 4", color = "Fr:Re")
+```
+
+```{r cv results, echo=FALSE}
+cv_summarized %>% 
+  tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>% 
+  dplyr::group_by(moment, name) %>% 
+  dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
+  dplyr::ungroup() %>% 
+  dplyr::filter(value == best) %>% 
+  dplyr::select(moment, degree, root, log, name, value) %>% 
+  dplyr::mutate(value = scales::comma(value, accuracy = 0.00001)) %>% 
+  kableExtra::kable(format = "markdown")
 ```
 
 ```{r}
