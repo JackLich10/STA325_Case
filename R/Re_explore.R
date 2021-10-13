@@ -149,9 +149,8 @@ train <- train %>%
   mutate(
     central_1 = R_moment_1, #mean
     central_2 = R_moment_2 - R_moment_1^2, #var
-    sd = sqrt(central_2),
-    central_3 = (R_moment_3 - 3*R_moment_2*R_moment_1 + 2*R_moment_1^3)/sd^3, #skew
-    central_4 = (R_moment_4 - 4*R_moment_3*R_moment_1 + 6*R_moment_2*R_moment_1^2 - 3*R_moment_1^4)/sd^4) #kurtosis
+    central_3 = (R_moment_3 - 3*R_moment_2*R_moment_1 + 2*R_moment_1^3), #skew
+    central_4 = (R_moment_4 - 4*R_moment_3*R_moment_1 + 6*R_moment_2*R_moment_1^2 - 3*R_moment_1^4)) #kurtosis
 
 # Interactions
 train %>% 
@@ -219,12 +218,7 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE, central = TRUE)
   
   mod <- data %>%
     lm(target ~ poly(St, degree)*interaction, data = .)
-  if (central && moment == 2) {
-    mod <- data %>%
-      lm(log(central_target) ~ poly(St, degree)*interaction, data = .)
-    print(summary(mod))
-  }
-  if (central && moment != 2) {
+  if (central) {
     mod <- data %>%
       lm(central_target ~ poly(St, degree)*interaction, data = .)
   }
@@ -234,7 +228,7 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE, central = TRUE)
   assess <- assess %>%
     dplyr::mutate(pred = predict(mod, ., type = "response") %>% as.numeric())
   
-  if (isTRUE(log) || (central && moment == 2)) {
+  if (isTRUE(log)) {
     assess <- assess %>%
       dplyr::mutate(pred = exp(pred))
   }
@@ -244,7 +238,7 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE, central = TRUE)
 cv <- tidyr::crossing(fold = 1:5,
                       degree = 2,
                       moment = 1:4,
-                      sqrt = c(FALSE),
+                      sqrt = c(TRUE),
                       log = c(FALSE),
                       central = c(TRUE, FALSE)) %>%
   dplyr::mutate(cv = purrr::pmap(list(fold, degree, moment, sqrt, log, central),
@@ -259,19 +253,17 @@ cv <- tidyr::crossing(fold = 1:5,
 undo_central <- function(cv) {
   cv_wide <- cv %>%
     dplyr::group_by(index, fold, degree, sqrt, log, central) %>%
-    summarise(moment, target, pred)
+    summarise(moment, pred)
   cv_wide <- cv_wide %>%
-    select(-target) %>%
     reshape2::dcast(index + fold + degree + sqrt + log + central ~ moment, value.var="pred")
   
   for (i in 1:nrow(cv_wide)) {
     if (cv_wide[i, ]$central) {
-      sd = sqrt(cv_wide[i, "2"])
       cv_wide[i, "2"] = cv_wide[i, "2"] + cv_wide[i, "1"]^2
       cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["sqrt"] == cv_wide[i, "sqrt"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["central"] == cv_wide[i, "central"]) & (cv["moment"] == 2), "pred"] = cv_wide[i, "2"] 
-      cv_wide[i, "3"] = cv_wide[i, "3"]*sd^3 - 2*cv_wide[i, "1"]^3 + 3*cv_wide[i, "2"]*cv_wide[i, "1"]
+      cv_wide[i, "3"] = cv_wide[i, "3"] - 2*cv_wide[i, "1"]^3 + 3*cv_wide[i, "2"]*cv_wide[i, "1"]
       cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["sqrt"] == cv_wide[i, "sqrt"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["central"] == cv_wide[i, "central"]) & (cv["moment"] == 3), "pred"] = cv_wide[i, "3"]
-      cv_wide[i, "4"] = cv_wide[i, "4"]*sd^4 + 3*cv_wide[i, "1"]^4 - 6*cv_wide[i, "2"]*cv_wide[i, "1"]^2 + 4*cv_wide[i, "3"]*cv_wide[i, "1"]
+      cv_wide[i, "4"] = cv_wide[i, "4"] + 3*cv_wide[i, "1"]^4 - 6*cv_wide[i, "2"]*cv_wide[i, "1"]^2 + 4*cv_wide[i, "3"]*cv_wide[i, "1"]
       cv[(cv["index"] == cv_wide[i, "index"]) & (cv["fold"] == cv_wide[i, "fold"]) & (cv["degree"] == cv_wide[i, "degree"]) & (cv["sqrt"] == cv_wide[i, "sqrt"]) & (cv["log"] == cv_wide[i, "log"]) & (cv["central"] == cv_wide[i, "central"]) & (cv["moment"] == 4), "pred"] = cv_wide[i, "4"]
     }
   }
@@ -296,56 +288,90 @@ cv_summarized %>%
   geom_point() +
   facet_wrap(~ type, scales = "free", nrow = 4)
 
+# ---------------------------------------------------------------------------------------------------
+# For extrapolation
+library(splines)
+train <- train %>%
+  mutate(Fr = 2/pi*atan(Fr), FrRe = Fr*Re)
+
+set.seed(123)
+train$index <- 1:nrow(train)
+spl <- rsample::initial_split(train, prop = 0.8)
+tr <- rsample::training(spl)
+te <- rsample::testing(spl)
+
+# create folds
+set.seed(234)
+folds <- rsample::vfold_cv(tr, v = 5)
+           
+lm_cv <- function(fold, degree, moment, root = 2, log = TRUE, extrapolate = TRUE) {
+  data <- rsample::analysis(folds$splits[[fold]]) %>%
+    dplyr::mutate(target = !!dplyr::sym(paste0("R_moment_", moment))) %>% 
+    tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE)
+  assess <- rsample::assessment(folds$splits[[fold]]) %>%
+    dplyr::mutate(target = !!dplyr::sym(paste0("R_moment_", moment))) %>% 
+    tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE)
+  
+  data <- data %>%
+      dplyr::mutate(St = St^(1/root))
+    assess <- assess %>%
+      dplyr::mutate(St = St^(1/root))
+  
+  if (isTRUE(log)) {
+    data <- data %>%
+      dplyr::mutate(target = log(target))
+    assess <- assess
+  }
+  
+  if (extrapolate) {
+    mod <- data %>%
+      lm(target ~ ns(St, df=degree)*Re*Fr, data= .)
+    print(summary(mod))
+  } else {
+    mod <- data %>%
+      lm(target ~ poly(St, degree)*interaction(), data = .)
+  }
+  
+  assess <- assess %>%
+    dplyr::mutate(pred = predict(mod, ., type = "response") %>% as.numeric())
+  
+  if (isTRUE(log)) {
+    assess <- assess %>%
+      dplyr::mutate(pred = exp(pred))
+  }
+  return(assess)
+}
+
+cv <- tidyr::crossing(fold = 1:5,
+                      degree = c(1, 2),
+                      moment = 1:4,
+                      root = c(1, 2, 3, 4, 5, 6),
+                      log = c(FALSE),
+                      extrapolate = c(TRUE)) %>%
+  dplyr::mutate(cv = purrr::pmap(list(fold, degree, moment, root, log, extrapolate),
+                                 ~ lm_cv(fold = ..1,
+                                         degree = ..2,
+                                         moment = ..3,
+                                         root = ..4,
+                                         log = ..5,
+                                         extrapolate = ..6))) %>%
+  tidyr::unnest(cv)
+
+cv_summarized <- cv %>%
+  dplyr::group_by(moment = factor(moment), degree, root, log, extrapolate) %>%
+  dplyr::summarise(rmse = sqrt(mean((pred-target)^2)),
+                   mae = mean(abs(pred-target)),
+                   broom::glance(lm(target ~ pred, data = dplyr::cur_data())),
+                   .groups = "drop")
+
 cv_summarized %>% 
-  pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>% 
-  group_by(moment, name) %>% 
-  mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
-  ungroup() %>% 
-  filter(value == best) %>% 
-  select(moment, degree, sqrt, log, name, central, value) %>% 
-  mutate(value = scales::comma(value, accuracy = 0.00001)) %>% 
-  kableExtra::kable(format = "markdown")
-
-# moment 1
-train_long %>%
-  filter(moment_type == "1") %>%
-  mutate(St = sqrt(St)) %>%
-  lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
-  summary()
-ggplot(aes(St, moment_value, color = moment_type)) +
+  filter(log == FALSE) %>% 
+  dplyr::mutate(moment = paste0("Moment: ", moment)) %>%
+  tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>%
+  tidyr::unite(type, moment, name, sep = ": ", remove = FALSE) %>%
+  ggplot(aes(root, value, color = as.factor(degree))) +
+  geom_line() +
   geom_point() +
-  geom_smooth() +
-  facet_wrap(~ interaction, scales = "free")
-
-# moment 2
-train_long %>%
-  filter(moment_type == "2") %>%
-  mutate(St = sqrt(St)) %>%
-  lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
-  summary()
-ggplot(aes(St, moment_value, color = moment_type)) +
-  geom_point() +
-  geom_smooth() +
-  facet_wrap(~ interaction, scales = "free")
-
-# moment 3
-train_long %>%
-  filter(moment_type == "3") %>%
-  mutate(St = sqrt(St)) %>%
-  lm(moment_value ~ poly(St, 3)*interaction, data = .) %>%
-  summary()
-ggplot(aes(St, moment_value, color = moment_type)) +
-  geom_point() +
-  geom_smooth() +
-  facet_wrap(~ interaction, scales = "free")
-
-# moment 4
-train_long %>%
-  filter(moment_type == "4") %>%
-  mutate(St = sqrt(St)) %>%
-  lm(moment_value ~ poly(St, 2)*interaction, data = .) %>%
-  summary()
-ggplot(aes(St, moment_value, color = moment_type)) +
-  geom_point() +
-  geom_smooth() +
-  facet_wrap(~ interaction, scales = "free")
+  facet_wrap(~ type, scales = "free", nrow = 4)
+           
+           

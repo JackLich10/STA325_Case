@@ -4,13 +4,7 @@ author: "Jingxuan Liu, Linda Tang, Justin Zhao, Mary Wang, Abbey List, and Jack 
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
-editor_options:
-  chunk_output_type: console
 ---
-
-```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = F, message = F, warning=F)
-```
 
 ```{r load-library}
 library(tidyverse)
@@ -71,17 +65,17 @@ tr_long <- tr %>%
 
 # plot St vs. R_moment_*, color by interaction between Fr, Re
 tr_long %>%
-  ggplot(aes(St, value, color = interaction(Fr, Re))) +
+  ggplot(aes(sqrt(St), value, color = interaction(Fr, Re))) +
   geom_point() +
-  geom_smooth() +
+  geom_smooth(method="lm") +
   facet_wrap(~ moment, scales = "free", labeller = label_both)
 
 plot_moment <- function(mt) {
   tr_long %>%
     filter(moment == mt) %>%
-    ggplot(aes(St, value)) +
+    ggplot(aes(sqrt(St), value)) +
     geom_point() +
-    geom_smooth() +
+    geom_smooth(method="lm") +
     facet_wrap(~ interaction(Fr, Re), scales = "free") +
     labs(title = paste0("Moment: ", mt))
 }
@@ -100,7 +94,7 @@ Below, we perform cross validation of a number of candidate models for each mome
 
 ```{r cv lm, echo=FALSE}
 # function to train on a given fold, using given degree, predicting given moment
-lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
+lm_cv <- function(fold, root, degree, moment, sqrt = TRUE, log = TRUE) {
   data <- rsample::analysis(folds$splits[[fold]]) %>%
     dplyr::mutate(target = !!dplyr::sym(paste0("R_moment_", moment))) %>% 
     tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE)
@@ -110,9 +104,9 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
 
   if (isTRUE(sqrt)) {
     data <- data %>%
-      dplyr::mutate(St = sqrt(St))
+      dplyr::mutate(St = St^(1/root))
     assess <- assess %>%
-      dplyr::mutate(St = sqrt(St))
+      dplyr::mutate(St = St^(1/root))
   }
 
   if (isTRUE(log)) {
@@ -121,8 +115,13 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
     assess <- assess
   }
 
-  mod <- data %>%
-    lm(target ~ poly(St, degree)*interaction, data = .)
+  if (degree == 1) {
+    mod <- data %>%
+    lm(target ~ poly(St, 2)*interaction, data = .)
+  } else {
+    mod <- data %>%
+    lm(target ~ as.factor(Fr) + St + Re + as.factor(Fr)*St + Re*St + poly(St, 2)*interaction, data = .)
+  }
 
   train_adj_r2 <- broom::glance(mod)$adj.r.squared
 
@@ -140,22 +139,24 @@ lm_cv <- function(fold, degree, moment, sqrt = TRUE, log = TRUE) {
 ```{r cv perform, echo=FALSE}
 # compute CV
 cv <- tidyr::crossing(fold = 1:5,
-                      degree = 1:3,
+                      root = c(1, 2, 3, 4, 5, 6, 7, 8),
                       moment = 1:4,
-                      sqrt = c(TRUE, FALSE),
-                      log = c(TRUE, FALSE)) %>%
-  dplyr::mutate(cv = purrr::pmap(list(fold, degree, moment, sqrt, log),
+                      sqrt = c(TRUE),
+                      log = c(FALSE),
+                      degree = c(1, 2)) %>%
+  dplyr::mutate(cv = purrr::pmap(list(fold, root, moment, sqrt, log, degree),
                                  ~ lm_cv(fold = ..1,
-                                         degree = ..2,
+                                         root = ..2,
                                          moment = ..3,
                                          sqrt = ..4,
-                                         log = ..5))) %>%
+                                         log = ..5,
+                                         degree = ..6))) %>%
   tidyr::unnest(cv)
 ```
 
 ```{r, echo=FALSE}
 cv_summarized <- cv %>%
-  dplyr::group_by(moment = factor(moment), degree, sqrt, log) %>%
+  dplyr::group_by(moment = factor(moment), root, degree, sqrt, log) %>%
   dplyr::summarise(rmse = sqrt(mean((pred-target)^2)),
                    mae = mean(abs(pred-target)),
                    broom::glance(lm(target ~ pred, data = dplyr::cur_data())),
@@ -166,7 +167,7 @@ cv_summarized %>%
   dplyr::mutate(moment = paste0("Moment: ", moment)) %>%
   tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>%
   tidyr::unite(type, moment, name, sep = ": ", remove = FALSE) %>%
-  ggplot(aes(degree, value, color = sqrt, lty = log)) +
+  ggplot(aes(root, value, color = as.factor(degree))) +
   geom_line() +
   geom_point() +
   facet_wrap(~ type, scales = "free", nrow = 4)
@@ -185,6 +186,45 @@ cv_summarized %>%
 ```
 
 ## Results
+
+```{r}
+# potential outlers: 82 / 80, 85
+model1 <- train %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  lm(R_moment_1 ~ poly(St, 1)*interaction, data = .)
+summary(model1)
+plot(model1)
+```
+
+```{r}
+# potential outliers: 20, 65
+model2 <- train %>%
+  mutate(St = St^(1/4)) %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  lm(R_moment_2 ~ poly(St, 2)*interaction, data = .)
+summary(model2)
+plot(model2)
+```
+
+```{r}
+# potential outliers: 79, 20
+model3 <- train %>%
+  mutate(St = St^(1/3)) %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  lm(R_moment_3 ~ factor(Fr) + St + Re + as.factor(Fr)*St + Re*St + poly(St, 2)*interaction, data = .)
+summary(model3)
+plot(model3)
+```
+
+```{r}
+#potential outliers: 79
+model4 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
+  lm(R_moment_4 ~ poly(St, 2)*interaction, data = .)
+summary(model4)
+plot(model4)
+```
 
 ## Discussion
 
