@@ -41,7 +41,7 @@ train <- train %>%
 
 Turbulence is a fundamental concept in fluid mechanics. Irregular, unpredictable, and energy-dissipating, turbulent flow enhances mixing, which leads to non-uniform distribution of particles and cluster formation. Understanding and predicting turbulence has great practical significance in many scientific areas including aeronautical engineering and environmental science.
 
-Existing research suggests that the clustering of particles subject toturbulent flow is mainly determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number, which correspond to the intentsity of turbulence, impact of gravitational acceleration, and particle properties. <!-- insert 1 example on individual influence; followed by one on interaction --> 
+Existing research suggests that the clustering of particles subject toturbulent flow is mainly determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number, which correspond to the intentsity of turbulence, impact of gravitational acceleration, and particle properties. These parameters may influence clustering individually; a large $St$, for example, correlates with large particle size, which tends to form relatively loose clusters (Ireland et al., 2016). The parameters may also interact with each other to impact cluser formation.  <!-- insert an example on interaction --> 
 
 Despite the importance of turbulence, current understanding of *how* Re, Fr, and St contribute to clustering remains rudimentary. Similation methods like the Direct Numerical Simulation (DNS) of Navier-Stokes equations have been applied, but progress is limited by the time-consuming and computationally-expensive nature of such methodologies (Moin & Mahesh, 1998). Leveraging on generated data, the present study *aims* to build a statistical model that investigates how Re, Fr and St influence particle cluster volume distribution. We hope that our model will 1) enhance our understanding of the relative influence of these parameters in turbulent flow, and 2) enable a quick and efficient prediction of a particle cluster volume distribution without the needs for simulation.
 
@@ -51,7 +51,7 @@ Despite the importance of turbulence, current understanding of *how* Re, Fr, and
 
 The data (*n* = 89) for the present study comes from Direct Numerical Simulation. Voronoi Tessellation, a technique that examines general features of individual clusters in the underlying turbulence, was applied to generate a distribution of cluster volumes. The original data contains information regarding the generated distributions in the form of the first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, as well as Re, Fr, and St values. 
 
-For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments (Moment 1 is untouched as it already signifies the mean), which describe the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, despite their numerical nature, Fr and Re only contains three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$) in the data. Given such, the variables were converted into factors (See Section 2.4 for an alternative modeling approach that may overcome this limitation). 
+For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments (Moment 1 is untouched as it already signifies the mean), which describe the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, despite their numerical nature, Fr and Re only contains three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$, see Figure S1 for distribution) in the data. Given such, the variables were converted into factors (See Section 2.4 for an alternative modeling approach that may overcome this limitation). 
 
 ### 2.2 Model Building
 
@@ -197,7 +197,7 @@ In these models, $Re$ is numeric and $Fr$ is transformed to a numeric variable o
 
 ## Results
 
-Selected outputs from the final models of each moment are displayed in Table 1 (See Tables XX-XX for full outputs). 
+Selected outputs from the final models of each moment are displayed in Table 1. Please refer to Table S1 for the error values for the final models and Tables S2-S5 for full outputs.
 
 ```{r}
 # potential outlers: 82 / 80, 85
@@ -372,7 +372,9 @@ For $Fr$ in particular, 0.3 represents cumulonimbus clouds and 0.052 represents 
 
 ## Appendix 
 
-```{r hist pred, fig.height = 3, fig.width=8}
+### Figures 
+
+```{r fig-S1, fig.height = 3, fig.width=8, fig.cap="\\textbf{Figure S1.} Distribution of the three levels of Re and Fr. The values are treated as factor levels in our main analysis."}
 # histograms of predictors
 tr %>%
   pivot_longer(cols = c(Re:Fr),
@@ -383,82 +385,152 @@ tr %>%
   facet_wrap(~ metric, scales = "free")
 ```
 
-```{r eda plots, echo=FALSE, eval=FALSE}
-tr_long <- tr %>%
-  tidyr::pivot_longer(cols = starts_with("R_moment"),
-                      names_to = "moment",
-                      names_prefix = "R_moment_",
-                      values_to = "value") 
-# plot St vs. R_moment_*, color by interaction between Fr, Re
-tr_long %>%
-  ggplot(aes(St, value, color = interaction(Fr, Re))) +
-  geom_point() +
-  geom_smooth() +
-  facet_wrap(~ moment, scales = "free", labeller = label_both)
-plot_moment <- function(mt) {
-  tr_long %>%
-    dplyr::filter(moment == mt) %>%
-    ggplot(aes(St, value)) +
-    geom_point() +
-    geom_smooth() +
-    facet_wrap(~ interaction(Fr, Re), scales = "free") +
-    labs(title = paste0("Moment: ", mt))
-}
-cowplot::plot_grid(plot_moment("1"), plot_moment("2"), 
-                   nrow = 1, ncol = 2)
-cowplot::plot_grid(plot_moment("3"), plot_moment("4"), 
-                   nrow = 1, ncol = 2)
-```
-
-```{r Figure-S1, fig.cap = "Moment 1 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r Figure-S2, fig.height = 3.5, fig.cap = "\\textbf{Figure S2.} Moment 1 values as a function of St at different levels of interaction between Fr and Re."}
 tr %>%
   ggplot(aes(x = St, y = R_moment_1, color = interaction(Fr, Re))) +
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "Particle Size", y = "Moment 1", color = "Fr:Re")
+  labs(x = "St", y = "Moment 1", color = "Fr:Re")
 ```
 
-```{r Figure-S2, fig.cap = "Moment 2 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r Figure-S3, fig.height = 3.5, fig.cap = "\\textbf{Figure S3.} Central Moment 2 values as a function of St at different levels of interaction between Fr and Re."}
 train %>%
-  ggplot(aes(x = St, y = R_moment_2, color = interaction(Fr, Re))) +
+  ggplot(aes(x = St, y = central_2, color = interaction(Fr, Re))) +
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "Particle Size", y = "Moment 2", color = "Fr:Re")
+  labs(x = "St", y = "Central Moment 2", color = "Fr:Re")
 ```
 
-```{r Figure-S3, fig.cap = "Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r Figure-S4, fig.height = 3.5, fig.cap = "\\textbf{Figure S4.} Central Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
-  ggplot(aes(x = St, y = R_moment_3, color = interaction(Fr, Re))) +
+  ggplot(aes(x = St, y = central_3, color = interaction(Fr, Re))) +
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "Particle Size", y = "Moment 3", color = "Fr:Re")
+  labs(x = "St", y = "Central Moment 3", color = "Fr:Re")
 ```
 
-```{r Figure-S4, fig.cap = "Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
+```{r Figure-S5, fig.height = 3.5, fig.cap = "\\textbf{Figure S5.} Central Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
   ggplot(aes(x = St, y = R_moment_4, color = interaction(Fr, Re))) +
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "Particle Size", y = "Moment 4", color = "Fr:Re")
+  labs(x = "St", y = "Central Moment 4", color = "Fr:Re")
 ```
 
-```{r cv results, echo=FALSE}
-cv_summarized %>% 
+\newpage 
+
+### Tables 
+
+```{r table-s1 cv results, echo=FALSE}
+tableS1 <-cv_summarized %>% 
   tidyr::pivot_longer(cols = c(rmse, mae, adj.r.squared)) %>% 
   dplyr::group_by(moment, name) %>% 
   dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
-  dplyr::ungroup() %>% 
-  dplyr::filter(value == best) %>% 
-  dplyr::select(moment, degree, root, log, name, value) %>% 
-  dplyr::mutate(value = scales::comma(value, accuracy = 0.00001)) %>% 
-  kableExtra::kable(format = "markdown")
+  ungroup() %>% 
+  filter(value == best) %>% 
+  select(moment, degree, root, log, name, value) %>% 
+  mutate(value = scales::comma(value, accuracy = 0.00001)) 
+
+kable(tableS1, booktabs = T)%>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Errors from final models for each moment",
+           general_title = "Table S1.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
 ```
 
-```{r}
+```{r table-s2}
+mod1 <- tidy(model1) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  ))
+kable(mod1, booktabs = T, escape = F, linesep = NULL, col.names = c(
+          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+        ))%>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Full output of the final model for predicting Moment One",
+           general_title = "Table S2.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
+
+```
+
+```{r table-s3}
+mod2 <- tidy(model2) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  )) 
+
+kable(mod2, booktabs = T, escape = F, linesep = NULL, col.names = c(
+          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+        ))%>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Full output of the final model for predicting Central Moment Two",
+           general_title = "Table S3.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
+```
+
+```{r table-s4}
+mod3 <- tidy(model3) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  )) 
+
+kable(mod3, booktabs = T, escape = F, linesep = NULL, col.names = c(
+          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+        ))%>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Full output of the final model for predicting Central Moment Three",
+           general_title = "Table S4.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
+```
+
+```{r table-s5}
+mod4 <- tidy(model4) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  )) 
+
+kable(mod4, booktabs = T, escape = F, linesep = NULL, col.names = c(
+          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+        ))%>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Full output of the final model for predicting Central Moment Five",
+           general_title = "Table S5.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
+```
+
+
+```{r eval = FALSE}
 # Note: don't perform as well because splines tend to require more data to fit + extrapolation means more uncertainty generally
 model1 <- train %>%
   lm(R_moment_1 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
