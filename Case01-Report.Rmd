@@ -20,6 +20,7 @@ library(broom)
 library(knitr)
 library(kableExtra)
 library(patchwork)
+library(car)
 theme_set(theme_light()) # setting a theme
 ```
 
@@ -411,35 +412,43 @@ train %>%
 
 ### Model Diagnoistics
 
-**Modeling assumptions for linear regression**: 
+***Modeling assumptions for linear regression***: 
 
-1. **Linearity**: Linearity is satisfied for all 4 models since in the residuals vs. predicted plot, there's no obvious pattern in the residuals are the value of the predictors increase. The residuals are randomly scattered around 0, supporting that there's a linear relationship between the predictors and the response (after variable transformation). 
-2. **Constant variance**: In the residuals vs. predicted plot for all 4 models, the vertical spread of the residual remain relatively constant as the predicted values increases, suggesting that the variance of the error is constant along all predicted values. 
-3. **Independence**: The data was generated from Direct Numerical Stimulation (DNS) of the Navier-Stokes equations, where each trial was conducted independently using different values of the parameter (Re, Fr, St). Based on the information about data collection, we believe the independence assumption is satisfied.
-4. **Normality**: Normality may be violated since the distribution of the residuals doesn't follow a normal distribution and the points do not fall along a straight diagonal line on the normal quantile plot. The flat region in the normal quantile plot indicates there's a lot of nearly identical values, and the curved shape suggests that the distribution may be heavy-tailed. This violation makes sense in the context of the dataset since we observed that both the raw moments and central moments are highly skewed to the right with most values close to 0 with some extreme outliers. 
+* **Linearity**: Linearity is satisfied for all 4 models since in the predicted vs. standardized residuals plots (Panel A), there's no obvious pattern in the residuals are the value of the predictors increase. The residuals are randomly scattered around 0, supporting that there's a linear relationship between the predictors and the response (after variable transformation). 
+* **Constant variance**: In the residuals vs. predicted plot for all 4 models, the vertical spread of the residual remain relatively constant as the predicted values increases, suggesting that the variance of the error is constant along all predicted values (Panel A). 
+* **Independence**: The data was generated from Direct Numerical Stimulation (DNS) of the Navier-Stokes equations, where each trial was conducted independently using different values of the parameter (Re, Fr, St). Based on the information about data collection, we believe the independence assumption is satisfied.
+* **Normality**: Normality may be violated since the distribution of the residuals doesn't follow a normal distribution and the points do not fall along a straight diagonal line on the normal quantile plot. The flat region in the normal quantile plot indicates there's a lot of nearly identical values, and the curved shape suggests that the distribution may be heavy-tailed. This violation makes sense in the context of the dataset since we observed that both the raw moments and central moments are highly skewed to the right with most values close to 0 with some extreme outliers (Panel B). 
 
-**Influential points and outliers**: We assessed outliers and influential points in our dataset using Cook's distance 
+***Influential points and outliers***: We assessed influential points in our dataset using Cook's distance (Panel C). Besides having a few influential points for model 1, all observations had Cook's distance less than 0.5 for the rest of the models. In addition, from the predicted vs. standardized residuals plots (Panel A), there are only a few outliers with standardized residual greater than 5.
+
+***Multicolinearity***: We assessed multicolinearity using variance inflation factor (VIF), which was below 10 for all predictors in all 4 models, suggesting no serious issue of multicolinearity. 
 
 ```{r diag}
 diag_plot <- function(model) {
   
-  resid_fitted <- ggplot(data = model, aes(x = .fitted, y = .resid)) +
-  geom_point() +
-  geom_hline(yintercept = 0, color = "red") +
-  labs(x = "Predicted values", 
-       y = "Residual", 
-       title = "Residuals vs. Predicted") + 
-    theme(plot.title = element_text(size = 8), 
-          axis.title = element_text(size = 6))
+  model_aug <- augment(model) %>%
+    mutate(obs_num = row_number())
+
+  resid_fitted <- ggplot(data = model_aug, aes(x = .fitted, y = .std.resid)) +
+    geom_point(alpha = 0.7) +
+    geom_hline(yintercept = c(-2, 2), color = "blue", lty = 2) +
+    geom_hline(yintercept = c(-3, 3), color = "red", lty = 3) +
+    labs(x = "Predicted values",
+         y = "Standardized Residual",
+         title = "Fitted vs. Standardized Residual") +
+    theme_bw() +
+    theme(plot.title = element_text(size = 8),
+          axis.title = element_text(size = 6),
+          axis.text = element_text(size = 5))
+
   resid_qq <- ggplot(data = model, aes(sample = .resid)) +
   stat_qq() + 
   stat_qq_line() +
-  labs(title = "Normal QQ-plot of residuals") + 
+  labs(title = "Normal Quantile plot of residuals") + 
     theme(plot.title = element_text(size = 8), 
-          axis.title = element_text(size = 6))
+          axis.title = element_text(size = 6), 
+          axis.text = element_text(size = 5))
   
-  model_aug <- augment(model) %>%
-    mutate(obs_num = row_number()) 
   cook <- ggplot(data = model_aug, aes(x = obs_num, y = .cooksd)) + 
     geom_point(alpha = 0.7) + 
     geom_hline(yintercept = 0.5, color = "blue", lty = 2) +
@@ -449,7 +458,8 @@ diag_plot <- function(model) {
                                as.character(obs_num), "")), nudge_x = 4) + 
     labs(title = "Observation number vs. Cook's distance") + 
     theme(plot.title = element_text(size = 8), 
-          axis.title = element_text(size = 6))
+          axis.title = element_text(size = 6), 
+          axis.text = element_text(size = 5))
   
   resid_fitted / (resid_qq + cook) + 
     plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(size = 8))
@@ -457,21 +467,36 @@ diag_plot <- function(model) {
 ```
 
 ```{r Diag Model 1, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 1."}
-#model1 <- augment(model1)
 diag_plot(model1)
+```
+
+```{r}
+vif(model1) %>% kable(format = "markdown")
 ```
 
 ```{r Diag Model 2, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 2."}
 diag_plot(model2)
 ```
 
+```{r}
+vif(model2) %>% kable(format = "markdown")
+```
+
 ```{r Diag Model 3, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 3."}
 diag_plot(model3)
+```
+
+```{r}
+vif(model3) %>% kable(format = "markdown")
 ```
 
 ```{r Diag Model 4, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 4."}
 diag_plot(model4)
 ```
+
+```{r}
+vif(model4) %>% kable(format = "markdown")
+``` 
 
 \newpage
 
