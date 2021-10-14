@@ -38,7 +38,7 @@ train <- train %>%
     central_4 = (R_moment_4 - 4*R_moment_3*R_moment_1 + 6*R_moment_2*R_moment_1^2 - 3*R_moment_1^4)) #kurtosis
 ```
 
-## 1 Introduction 
+### 1 Introduction 
 
 Turbulence is a fundamental concept in fluid mechanics. Irregular, unpredictable, and energy-dissipating, turbulent flow enhances mixing, which leads to non-uniform distribution of particles and cluster formation. Understanding and predicting turbulence has great practical significance in many scientific areas including aeronautical engineering and environmental science.
 
@@ -46,15 +46,15 @@ Existing research suggests that the clustering of particles subject to turbulent
 
 Despite the importance of turbulence, current understanding of *how* Re, Fr, and St contribute to clustering remains rudimentary. Simulation methods like the Direct Numerical Simulation (DNS) of Navier-Stokes equations have been applied, but progress is limited by the time-consuming and computationally-expensive nature of such methodologies (Moin & Mahesh, 1998). Leveraging on generated data, the present study *aims* to build a statistical model that investigates how Re, Fr and St influence particle cluster volume distribution. We hope that our model will 1) enhance our understanding of the relative influence of these parameters in turbulent flow, and 2) enable a quick and efficient prediction of a particle cluster volume distribution without the needs for simulation.
 
-## 2 Methods
+### 2 Methods
 
-### 2.1 Data
+#### 2.1 Data
 
 The data (*n* = 89) for the present study comes from Direct Numerical Simulation. Voronoi Tessellation, a technique that examines general features of individual clusters in the underlying turbulence, was applied to generate a distribution of cluster volumes. The original data contains information regarding the generated distributions in the form of the first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, as well as Re, Fr, and St values. 
 
 For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments (Moment 1 is untouched as it already signifies the mean), which describe the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, despite their numerical nature, Fr and Re only contains three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$, see Figure S1 for distribution) in the training data. We decided to model them as categorical variables because 1) treating them as numeric variables put our model at risk for extrapolation since the there's no data at many levels of Re and Fr making our model unable to learn the trend around that region 2) we believe that these categories could carry some real life significance. For instance, Fr = 0.3 is representative of cumulonimbus clouds and 0.052 is representative of cumulus clouds. Interpreting their effect in categories can offer insight on practical examples (?). <!-- how to word this -->
 
-### 2.2 Model Construction
+#### 2.2 Model Construction
 
 A closer examination of the data revealed interesting interactive patterns among the independent and dependent variables. Specifically, $St$ appears to assume a strong, non-linear relationship with each of the moments (Figures S1-S4 in the Appendix). These relationships vary between roughly linear to noticeably curved, potentially quadratic or cubic. In addition, such relationships diverge across different moments, and appears highly influenced by the combined levels of $Re$ and $Fr$. From the curved shape of the relationship between `St` and the responses, we also noticed that we may benefit from taking certain roots of `St` to make that more linear. 
 
@@ -212,7 +212,7 @@ $$\text{Central Moment}_4 \sim \text{poly}(\sqrt{St}, 2) * (Fr, Re)$$
 
 The linearity, constant variance, independence assumption for linear regression is satisfied and we observed some violation of normality. There's few outliers and influential points. Furthermore, the variance inflation factors indicate no serious concerns of multicolinearity (Model diagnostics section in the Appendix). 
 
-### 2.3 Model Extension
+#### 2.3 Model Extension
 
 Despite certain advantages in modeling $Re$ and $Fr$ as categorical variables, we recognize the need to extrapolate beyond the three levels of $Re$ and $Fr$ to model real life circumstances and enable a wider range of prediction. To address the limitations of our current models, we provide the following related models using natural splines that can be used for extrapolation: 
 
@@ -220,7 +220,7 @@ $$\text{Raw Moment}_1 \sim \text{ns}(St, df=1)*Re*Fr'$$
 $$\text{Raw Moment}_{2,3,4} \sim \text{ns}(\sqrt{St}, df=1)*Re*Fr'$$
 In these models, $Re$ is numeric and $Fr$ is transformed to a numeric variable on $[0, 1]$ using $Fr' = \frac{2}{\pi}*arctan(Fr)$. The form is similar in keeping the significant three-way interaction, except with natural splines to address the poor fits of polynomials at the tails, a location that is especially important in learning about particle behavior in high turbulence. Again, the root and degree are chosen through 5-fold cross validation. See appendix for fitted coefficients.
 
-## Results
+### Results
 
 Selected outputs from the final models of each moment are displayed in Table 1. Please refer to Table S1 for the error values for the final models and Tables S2-S5 for full outputs.
 
@@ -361,9 +361,9 @@ Firstly, all models possess an adjusted $R^2$ of at least 0.98, indicating that 
 
 To better understand the relative influence of turbulence, gravitational acceleration and particle characteristics on cluster formation, we examined the model coefficients. For centralized moment 1, we see that interactions between all settings of Fr and the lowest setting of Re, along with their interactions with St, yield an expected increase in mean particle cluster volume size. This indicates that smoother flow at any level of gravitational acceleration and particle size may allow larger clusters to form, as they are not broken up by chaotic turbulence. These coefficients are statistically significant at the $\alpha = 0.01$ level with small standard errors. For centralized moments 2, 3, and 4, it appears that the interaction between lowest Fr and lowest Re, along with its interaction with St, has a positive association with each moment. The interaction with squared St has a negative association with each moment (note that the exact value of this squared transformation differs based on the root transformation applied to St for each moment) (?????? ask simon about interpreting positive non-squared, negative squared). This indicates that smoother flow and low gravitational acceleration are associated with greater variance, skew, and kurtosis (distributional "tailedness") of particle cluster size. The effect of particle size at these levels of Re and Fr may differ from the effect at other levels, as it is only statistically significant at these low settings of flow intensity and gravitational acceleration. These coefficients are statistically significant at the $\alpha = 0.01$ level.  
 
-## Discussion
+### Discussion
 
-In this study, we constructed four linear models with polynomial terms and interaction terms between Reynolds' number, Froude's number, and Stokes' number to predict the first four centralized moments (mean, variance, skew, and kurtosis) of particle cluster distribution. Our model were able to explain a large percentage of variation in each of the four moments with reasonable mean squared prediction error for each model. We found that smoother flow at any level of gravitational acceleration and particle size may be associated with larger mean cluster size, and smoother flow with low gravitational acceleration seemed to have a positive association with variance, skew, and kurtosis. Also, the effects of particle size on each moment seemed to be significantly different at lower flow intensity and lower gravitational acceleration than at other settings. Finally, it appears that for centralized moments 2, 3, and 4, the main effect of St (at low Fr and Re) has a positive association with the moments, while the squared effect has a negative association (how to explain this ?). 
+In this study, we constructed four linear models with polynomial terms and interaction terms between Reynolds' number, Froude's number, and Stokes' number to predict the first four centralized moments (related to mean, variance, skew, and kurtosis) of particle cluster distribution. Our model were able to explain a large percentage of variation in each of the four moments with reasonable mean squared prediction error for each model. We found that smoother flow at any level of gravitational acceleration and particle size may be associated with larger mean cluster size, and smoother flow with low gravitational acceleration seemed to have a positive association with variance, skew, and kurtosis. Also, the effects of particle size on each moment seemed to be significantly different at lower flow intensity and lower gravitational acceleration than at other settings. Finally, it appears that for centralized moments 2, 3, and 4, the main effect of St (at low Fr and Re) has a positive association with the moments, while the squared effect has a negative association (how to explain this ?). 
 
 One limitation of our analysis is that the coefficient estimates may not be accurate for our models since the 95% confidence intervals are relatively wide. This likely results from having a small training set with less than 100 data points. In addition, the normality assumption of linear regression is violated due to the extreme skewness and variation of the moments and there are several outliers for each model. Our training set may not be a representative sample that allows our model to learn the underlying trend and model the highly complex distribution of the moments. We recommend using caution in interpreting the exact coefficient estimates. 
 
