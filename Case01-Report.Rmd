@@ -62,7 +62,7 @@ Given the paucity of theoretical background in related field to guide model buil
 
 <!-- JL: should we talk about why selecting a linear model? --> 
 
-To implement the k-fold cross validation, for each moment, we trained candidate models to predict the moment with the general formula $Moment_i \sim poly(St_i^{(1/root)} , degree)*(Fr, Re)$, varying the *degree* parameter from 1 to 3, *root* from 1 to 6, and testing a log transformation of the response. We combined $Fr$ and $Re$ to form a new interaction variable $(Fr, Re)$ with 9 levels representing all combinations of $Fr$ and $Re$. We tested the model on each fold, and chose the parameters that give lower root mean squared errors (See Figure 1), with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares for interpretation. 
+To implement the k-fold cross validation, for each moment, we trained candidate models to predict the moment with the general formula $Moment_i \sim poly(St_i^{(1/root)} , degree)*(Fr, Re)$, varying the *degree* parameter from 1 to 3, *root* from 1 to 6, and testing a log transformation of the response. Literature supports a logarithmic dependence of acceleration on the Reynolds number (Zamansky, 2013); thus, we combined $Fr$ and $Re$ to form a new interaction variable $(Fr, Re)$ with 9 levels representing all combinations of $Fr$ and $Re$. We tested the model on each fold, and chose the parameters that give lower root mean squared errors (See Figure 1), with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares for interpretation. 
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -386,6 +386,8 @@ In addition, given the training set, our model was only fitted on Reynolds numbe
 - Ireland, P. J., Bragg, A. D., &amp; Collins, L. R. (2016, May 11). The effect of Reynolds number on inertial particle dynamics in isotropic turbulence. part&nbsp;2. simulations with gravitational effects: Journal of Fluid Mechanics. Cambridge Core. Retrieved October 12, 2021, from https://www.cambridge.org/core/journals/journal-of-fluid-mechanics/article/effect-of-reynolds-number-on-inertial-particle-dynamics-in-isotropic-turbulence-part-2-simulations-with-gravitational-effects/67C55CDC28B1B1C7868B7A402E279AF9. 
 
 - Moin, P., &amp; Mahesh, K. (n.d.). Direct numerical simulation: A tool in turbulence research. Annual Reviews. Retrieved October 12, 2021, from https://www.annualreviews.org/doi/full/10.1146/annurev.fluid.30.1.539. 
+
+- Zamansky, R., Vinkovic, I., &amp; Gorokhovski, M. 2013. Acceleration in turbulent channel flow: universalities in statistics, subgrid stochastic models and an application. Journal of Fluid Mechanics. Retrieved October 14, 2021, from https://hal.archives-ouvertes.fr/hal-00931506/document.  
 
 - slides: https://sakai.duke.edu/access/content/group/e1e1b166-17bd-4efc-bdfb-f3909d696910/Case%20Study/Data_Expedition_F2020_Reza_Jon.pdf
 
