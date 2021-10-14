@@ -272,34 +272,42 @@ model4 <- train %>%
 #kableExtra::kable(tidy(model4), format = "markdown", digits = 3, 
        #           caption = "Moment 4 Results")
 #plot(model4)
-model1.sig <- tidy(model1) %>%
+model1.sig <- tidy(model1, conf.int = TRUE, conf.level = 0.95) %>%
   filter(p.value < 0.05) %>%
   mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
   mutate(p.value = case_when(
     p.value < 0.001 ~ "<0.001",
     TRUE ~ as.character(p.value)
-  ))
-model2.sig <- tidy(model2) %>%
+  )) %>%
+  dplyr::select(-std.error, -statistic)
+
+model2.sig <- tidy(model2, conf.int = TRUE, conf.level = 0.95) %>%
   filter(p.value < 0.05) %>%
   mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
   mutate(p.value = case_when(
     p.value < 0.001 ~ "<0.001",
     TRUE ~ as.character(p.value)
-  ))
-model3.sig <- tidy(model3) %>%
+  )) %>%
+  dplyr::select(-std.error, -statistic)
+
+model3.sig <- tidy(model3, conf.int = TRUE, conf.level = 0.95) %>%
   filter(p.value < 0.05) %>%
   mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
   mutate(p.value = case_when(
     p.value < 0.001 ~ "<0.001",
     TRUE ~ as.character(p.value)
-  ))
-model4.sig <- tidy(model4) %>%
+  )) %>%
+  dplyr::select(-std.error, -statistic)
+
+model4.sig <- tidy(model4, conf.int = TRUE, conf.level = 0.95) %>%
   filter(p.value < 0.05) %>%
   mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
   mutate(p.value = case_when(
     p.value < 0.001 ~ "<0.001",
     TRUE ~ as.character(p.value)
-  ))
+  )) %>%
+  dplyr::select(-std.error, -statistic)
+
 ```
 
 ```{r}
@@ -315,7 +323,7 @@ Table_combined[16,1] <- cell_spec(Table_combined[16,1], bold = T)
  kable(Table_combined, format = "latex", 
         escape = F, booktabs = T, longtable=T, linesep = NULL,
         col.names = c(
-          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+          "Term", "$\\beta$", "$p$ value", "95 CI Lower", "95 CI Upper"
         )) %>% 
   kable_styling(position = "center")  %>% 
   footnote(general = "Outputs from final models of each moment. Only the significant terms are displayed here given limited space. Please refer to Tables XX-XX in Appendix for full output.",
@@ -364,6 +372,11 @@ For centralized moments 2, 3, and 4, it appears that the interaction between low
 In this study, we have utilized four linear models with polynomial terms and interaction terms between Reynolds' number, Froude's number, and Stokes' number to predict the first four centralized moments (mean, variance, skew, and kurtosis) of particle cluster distribution. These variables explained a large percentage of variation in each of the four moments, with reasonable mean squared error for each model. We found that smoother flow at any level of gravitational acceleration and particle size may be associated with larger mean cluster size, and smoother flow with low gravitational acceleration seemed to have a positive association with variance, skew, and kurtosis. Also, the effects of particle size on each moment seemed to be significantly different at lower flow intensity and lower gravitational acceleration than at other settings. Finally, it appears that for centralized moments 2, 3, and 4, the main effect of St (at low Fr and Re) has a positive association with the moments, while the squared effect has a negative association (how to explain this ?). 
 
 One limitation of our analysis is that Fr and Re are categorical variables in our models, while they are truly numeric. This may have a negative effect on predictive performance for extrapolation on values outside our categories; however, Section 2.4 describes a numerical model that can be used for extrapolation (did we ever provide the results for that model?).  
+
+Discuss uncertainty <- In discussion?
+Small data set, normality violation 
+Large spread, low representations at certain levels; be cautious to extrapolate 
+ 
 
 Also, our model was fit on Reynolds numbers up to 398, although numbers in the thousands are common in practice. Large Reynolds numbers are highly relevant to real life situations as a measure of turbulence intensity in atmospheric, oceanic turbulence flow (J. den Toonder et al., 1997), and although our modeling approach avoids the high computational cost of simulation at large Reynolds numbers, it may not be suitable for extrapolation at these settings due to the small numbers in the dataset. Using numerical variables and higher Reynolds numbers may be topics for further investigation.  
 
