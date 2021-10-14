@@ -19,6 +19,7 @@ library(splines)
 library(broom)
 library(knitr)
 library(kableExtra)
+library(patchwork)
 theme_set(theme_light()) # setting a theme
 ```
 
@@ -423,6 +424,74 @@ train %>%
 
 \newpage 
 
+### Model Diagnoistics
+
+**Modeling assumptions for linear regression**: 
+
+1. **Linearity**: Linearity is satisfied for all 4 models since in the residuals vs. predicted plot, there's no obvious pattern in the residuals are the value of the predictors increase. The residuals are randomly scattered around 0, supporting that there's a linear relationship between the predictors and the response (after variable transformation). 
+2. **Constant variance**: In the residuals vs. predicted plot for all 4 models, the vertical spread of the residual remain relatively constant as the predicted values increases, suggesting that the variance of the error is constant along all predicted values. 
+3. **Independence**: The data was generated from Direct Numerical Stimulation (DNS) of the Navier-Stokes equations, where each trial was conducted independently using different values of the parameter (Re, Fr, St). Based on the information about data collection, we believe the independence assumption is satisfied.
+4. **Normality**: Normality may be violated since the distribution of the residuals doesn't follow a normal distribution and the points do not fall along a straight diagonal line on the normal quantile plot. The flat region in the normal quantile plot indicates there's a lot of nearly identical values, and the curved shape suggests that the distribution may be heavy-tailed. This violation makes sense in the context of the dataset since we observed that both the raw moments and central moments are highly skewed to the right with most values close to 0 with some extreme outliers. 
+
+**Influential points and outliers**: We assessed outliers and influential points in our dataset using Cook's distance 
+
+```{r diag}
+diag_plot <- function(model) {
+  
+  resid_fitted <- ggplot(data = model, aes(x = .fitted, y = .resid)) +
+  geom_point() +
+  geom_hline(yintercept = 0, color = "red") +
+  labs(x = "Predicted values", 
+       y = "Residual", 
+       title = "Residuals vs. Predicted") + 
+    theme(plot.title = element_text(size = 8), 
+          axis.title = element_text(size = 6))
+
+  resid_qq <- ggplot(data = model, aes(sample = .resid)) +
+  stat_qq() + 
+  stat_qq_line() +
+  labs(title = "Normal QQ-plot of residuals") + 
+    theme(plot.title = element_text(size = 8), 
+          axis.title = element_text(size = 6))
+  
+  model_aug <- augment(model) %>%
+    mutate(obs_num = row_number()) 
+
+  cook <- ggplot(data = model_aug, aes(x = obs_num, y = .cooksd)) + 
+    geom_point(alpha = 0.7) + 
+    geom_hline(yintercept = 0.5, color = "blue", lty = 2) +
+    geom_hline(yintercept = 1, color = "red", lty = 3) +
+    labs(x = "Observation Number", y = "Cook's distance") +
+    geom_text(aes(label = ifelse(.hat > 1,
+                               as.character(obs_num), "")), nudge_x = 4) + 
+    labs(title = "Observation number vs. Cook's distance") + 
+    theme(plot.title = element_text(size = 8), 
+          axis.title = element_text(size = 6))
+  
+  resid_fitted / (resid_qq + cook) + 
+    plot_annotation(tag_levels = 'A') & theme(plot.tag = element_text(size = 8))
+}
+```
+
+```{r Diag Model 1, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 1."}
+#model1 <- augment(model1)
+diag_plot(model1)
+```
+
+```{r Diag Model 2, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 2."}
+diag_plot(model2)
+```
+
+```{r Diag Model 3, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 3."}
+diag_plot(model3)
+```
+
+```{r Diag Model 4, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 4."}
+diag_plot(model4)
+```
+
+\newpage
+
 ### Tables 
 
 ```{r table-s1 cv results, echo=FALSE}
@@ -565,5 +634,3 @@ train %>%
   ggplot(aes(x = St, y = central_4, color = interaction(Re,Fr))) +
   geom_point()
 ```
-
-
