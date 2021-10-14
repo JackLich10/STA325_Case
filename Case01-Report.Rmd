@@ -4,8 +4,8 @@ author: "Jack Lichtenstein, Abbey List, Jingxuan Liu, Linda Tang, Mary Wang, and
 date: "`r Sys.Date()`"
 output:
   pdf_document: default
-editor_options:
-  chunk_output_type: console
+header-includes:
+- \usepackage[labelformat = empty]{caption}
 ---
 
 ```{r setup, include=FALSE}
@@ -17,6 +17,8 @@ library(tidyverse)
 library(here)
 library(splines)
 library(broom)
+library(knitr)
+library(kableExtra)
 theme_set(theme_light()) # setting a theme
 ```
 
@@ -49,25 +51,19 @@ Despite the importance of turbulence, current understanding of *how* Re, Fr, and
 
 The data (*n* = 89) for the present study comes from Direct Numerical Simulation. Voronoi Tessellation, a technique that examines general features of individual clusters in the underlying turbulence, was applied to generate a distribution of cluster volumes. The original data contains information regarding the generated distributions in the form of the first four raw moments $E(X)$, $E(X^2)$, $E(X^3)$, and $E(X^4)$, as well as Re, Fr, and St values. 
 
-For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments, which describe the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, a closer examination of the data reveals that Fr and Re only contains three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$) in the data, despite their numerical nature. Given such, the variables were converted into factors (See Section 2.4 for an alternative modeling approach that may overcome this limitation). 
+For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments (Moment 1 is untouched as it already signifies the mean), which describe the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, despite their numerical nature, Fr and Re only contains three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$) in the data. Given such, the variables were converted into factors (See Section 2.4 for an alternative modeling approach that may overcome this limitation). 
 
-### 2.2 Model Selection
+### 2.2 Model Building
 
+A closer examination of the data revealed interesting interactive patterns among the independent and dependent variables. Specifically, $St$ appears to assume a strong, non-linear relationship with each of the moments (Figures S1-S4 in the Appendix). These relationships vary between roughly linear to noticeably curved, potentially quadratic or cubic. In addition, such relationships diverge across different moments, and appears highly influenced by the combined levels of $Re$ and $Fr$. From the curved shape of the relationship between `St` and the responses, we also noticed that we may benefit from taking certain roots of `St` to make that more linear. 
 
+Given the paucity of theoretical background in related field to guide model building, we decided to adopt a k-fold validation approach. This approach would allow us to explore different combinations of polynomial patterns and the interactions observed in our EDA and select the best fit model. Specifically, we used K = 5 given the small sample size at hand to avoid overfitting. 
 
-### 2.3 Final Models
+<!-- JL: should we talk about why selecting a linear model? --> 
 
-The forms of the statistical models, one for each moment, are:
-$$R\_{moment_1} \sim St*(Fr, Re)$$
-$$central_2 \sim poly(St^{1/4}, 2) * (Fr, Re)$$
-$$central_3 \sim poly(St^{1/3}, 2) * (Fr, Re)$$
-$$central_4 \sim poly(\sqrt{St}, 2) * (Fr, Re)$$
+To implement the k-fold cross validation, for each moment, we trained candidate models to predict the moment with the general formula $Moment_i \sim poly(St_i^{(1/root)} , degree)*(Fr, Re)$, varying the *degree* parameter from 1 to 3, *root* from 1 to 6, and testing a log transformation of the response. We combined $Fr$ and $Re$ to form a new interaction variable $(Fr, Re)$ with 9 levels representing all combinations of $Fr$ and $Re$. We tested the model on each fold, and chose the parameters that give lower root mean squared errors (See Figure 1), with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares for interpretation. 
 
-where $Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$ are categorical variables and $(Fr, Re)$ is an interaction term with 9 levels representing all combinations of $Fr$ and $Re$. For the fitted coefficients, see the results section.
-
-### 2.2 Justification
-
-
+<!-- @Jing where to mention diagnostics-->
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -87,14 +83,6 @@ te <- rsample::testing(spl)
 set.seed(234)
 folds <- rsample::vfold_cv(tr, v = 5)
 ```
-
-For other key properties, the three-way interaction between the predictors arises from exploratory data analysis where the relationship between $St$ and each moment appears highly influenced by the combined levels of $Re$ and $Fr$ (refer to Figures S1-S4 in the Appendix). In particular, this relationship varies between roughly linear to noticeably curved, potentially quadratic or cubic, and appears to be very strong. Additionally, we notice from the curved shape of the relationship between `St` and the response that we may benefit from taking certain roots of `St` to make that more linear.
-
-### 2.2 Fitting Process
-
-We used K-fold cross validation with $K=5$ to choose the model features, exploring linear regression and then nonlinear extensions into polynomial terms and interactions based on the EDA above. Since we only have 89 training observation, we do this in an effort to reduce the likelihood of overfitting.
-
-Specifically, for each moment, we train candidate models to predict the moment with the general formula `~ poly(St^(1/root), degree)*(Fr, Re)`, varying the `degree` parameter from 1 to 3, varyind `root` from 1 to 6, and testing a log transformation of the response. We then look at the estimated test errors (see Figure x) and chose the parameters that give lower errors, with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares. (@Jing where to mention diagnostics)
 
 ```{r cv lm, echo=FALSE}
 # function to train on a given fold, using given degree, predicting given moment
@@ -146,7 +134,7 @@ cv <- tidyr::crossing(fold = 1:5,
   tidyr::unnest(cv)
 ```
 
-```{r, echo=FALSE}
+```{r, echo=FALSE, fig.cap = "\\textbf{Figure 1.} Mean adjusted r-squared value, mean absolute error, and root mean squared error of models for each moment with varying root and polynomial degrees on St. The combination that lead to the lowest root mean squared error was selected as the final model for the moment."}
 # transform cv to wide format
 cv_wide <- cv %>% 
   dplyr::transmute(index, fold, degree, root, log, 
@@ -186,10 +174,18 @@ cv_summarized %>%
   geom_line() +
   geom_point() +
   facet_wrap(~ type, scales = "free", nrow = 4) +
-  labs(x = "Degree of root on `St`",
+  labs(x = "Root Degree",
        y = NULL,
-       color = "Degree of polynomial on `St`")
+       color = "Polynomial Degree")
 ```
+
+### 2.3 Final Models
+
+The final models for each moment, based on the k-fold cross-validation approach, are as below:
+$$Raw\:Moment_1 \sim St*(Fr, Re)$$
+$$Central\: Moment_2 \sim poly(St^{1/4}, 2) * (Fr, Re)$$
+$$Central\: Moment_3 \sim poly(St^{1/3}, 2) * (Fr, Re)$$
+$$Central\:Moment_4 \sim poly(\sqrt{St}, 2) * (Fr, Re)$$
 
 ### 2.4 Model Extension
 
@@ -201,7 +197,7 @@ In these models, $Re$ is numeric and $Fr$ is transformed to a numeric variable o
 
 ## Results
 
-Model Output:
+Selected outputs from the final models of each moment are displayed in Table 1 (See Tables XX-XX for full outputs). 
 
 ```{r}
 # potential outlers: 82 / 80, 85
@@ -209,8 +205,8 @@ model1 <- train %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_1 ~ poly(St, 1)*interaction, data = .)
 # summary(model1)
-kableExtra::kable(tidy(model1), format = "markdown", digits = 3, 
-                  caption = "Moment 1 Results")
+#kableExtra::kable(tidy(model1), format = "markdown", digits = 3, 
+  #                caption = "Moment 1 Results")
 #plot(model1)
 ```
 
@@ -221,9 +217,10 @@ model2 <- train %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_2 ~ poly(St, 2)*interaction, data = .)
 #summary(model2)
-kableExtra::kable(tidy(model2), format = "markdown", digits = 3, 
-                  caption = "Moment 2 Results")
+#kableExtra::kable(tidy(model2), format = "markdown", digits = 3, 
+     #             caption = "Moment 2 Results")
 #plot(model2)
+
 ```
 
 ```{r}
@@ -233,22 +230,82 @@ model3 <- train %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_3 ~ poly(St, 2)*interaction, data = .)
 #summary(model3)
-kableExtra::kable(tidy(model3), format = "markdown", digits = 3, 
-                  caption = "Moment 3 Results")
+#kableExtra::kable(tidy(model3), format = "markdown", digits = 3, 
+       #           caption = "Moment 3 Results")
 #plot(model3)
 ```
 
-```{r}
+```{r Table 1}
 #potential outliers: 79
 model4 <- train %>%
   mutate(St = sqrt(St)) %>%
   tidyr::unite(interaction, Fr, Re, sep = ": ", remove = FALSE) %>%
   lm(central_4 ~ poly(St, 2)*interaction, data = .)
 #summary(model4)
-kableExtra::kable(tidy(model4), format = "markdown", digits = 3, 
-                  caption = "Moment 4 Results")
+#kableExtra::kable(tidy(model4), format = "markdown", digits = 3, 
+       #           caption = "Moment 4 Results")
 #plot(model4)
+
+model1.sig <- tidy(model1) %>%
+  filter(p.value < 0.05) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+
+model2.sig <- tidy(model2) %>%
+  filter(p.value < 0.05) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+model3.sig <- tidy(model3) %>%
+  filter(p.value < 0.05) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+model4.sig <- tidy(model4) %>%
+  filter(p.value < 0.05) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
 ```
+
+```{r}
+mod.1 <- c("Moment 1", "", "", "", "")
+mod.2 <- c("Moment 2", "", "", "", "")
+mod.3 <- c("Moment 3", "", "", "", "")
+mod.4 <- c("Moment 4", "", "", "", "")
+Table_combined <- as.data.frame(rbind(mod.1, model1.sig, mod.2, model2.sig, mod.3, model3.sig, mod.4, model4.sig))
+
+Table_combined[1,1] <- cell_spec(Table_combined[1,1], bold = T)
+Table_combined[8,1] <- cell_spec(Table_combined[8,1], bold = T)
+Table_combined[12,1] <- cell_spec(Table_combined[12,1], bold = T)
+Table_combined[16,1] <- cell_spec(Table_combined[16,1], bold = T)
+
+ kable(Table_combined, format = "latex", 
+        escape = F, booktabs = T, longtable=T, linesep = NULL,
+        col.names = c(
+          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+        )) %>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Outputs from final models of each moment. Only the significant terms are displayed here given limited space. Please refer to Tables XX-XX in Appendix for full output.",
+           general_title = "Table 1.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
+```
+
 
 ```{r predict on holdout}
 test <- test %>% 
