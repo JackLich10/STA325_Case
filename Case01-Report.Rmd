@@ -550,3 +550,20 @@ model4 <- train %>%
   lm(R_moment_4 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
 summary(model4)
 ```
+
+```{r}
+train %>%
+  ggplot(aes(x = St, y = R_moment_1, color = interaction(Re,Fr))) +
+  geom_point()
+train %>%
+  ggplot(aes(x = St, y = central_2, color = interaction(Re,Fr))) +
+  geom_point()
+train %>%
+  ggplot(aes(x = St, y = central_3, color = interaction(Re,Fr))) +
+  geom_point()
+train %>%
+  ggplot(aes(x = St, y = central_4, color = interaction(Re,Fr))) +
+  geom_point()
+```
+
+
