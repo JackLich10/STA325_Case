@@ -393,9 +393,10 @@ In addition, given the training set, our model was only fit on Reynolds numbers 
 
 \newpage
 
+
 ## Appendix 
 
-### Figures 
+### Section A: Figures 
 
 ```{r fig-S1, fig.height = 3, fig.width=8, fig.cap="\\textbf{Figure S1.} Distribution of the three levels of Re and Fr. The values are treated as factor levels in our main analysis."}
 # histograms of predictors
@@ -404,9 +405,13 @@ tr %>%
                names_to = "metric",
                values_to = "value") %>%
   ggplot(aes(value)) +
-  geom_histogram(bins = 20, stat="count") +
-  facet_wrap(~ metric, scales = "free")
+  geom_histogram(bins = 20, stat = "Count") +
+  facet_wrap(~ metric, scales = "free") + 
+  labs(x = "Value", y = "Count") + 
+  theme(axis.text = element_text(size = 6))
 ```
+
+\hfill\break
 
 ```{r Figure-S2, fig.height = 3.5, fig.cap = "\\textbf{Figure S2.} Moment 1 values as a function of St at different levels of interaction between Fr and Re."}
 tr %>%
@@ -414,8 +419,15 @@ tr %>%
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "St", y = "Moment 1", color = "Fr:Re")
+  labs(x = "St", y = "Moment 1", color = "Fr:Re") + 
+  theme(legend.title = element_text(size = 7), 
+        legend.text = element_text(size = 5), 
+        axis.title = element_text(size = 6),
+        axis.text = element_text(size = 6), 
+        strip.text.x = element_text(size = 5))
 ```
+
+\hfill\break
 
 ```{r Figure-S3, fig.height = 3.5, fig.cap = "\\textbf{Figure S3.} Central Moment 2 values as a function of St at different levels of interaction between Fr and Re."}
 train %>%
@@ -423,8 +435,15 @@ train %>%
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "St", y = "Central Moment 2", color = "Fr:Re")
+  labs(x = "St", y = "Central Moment 2", color = "Fr:Re") +
+  theme(legend.title = element_text(size = 7), 
+        legend.text = element_text(size = 5), 
+        axis.title = element_text(size = 6),
+        axis.text = element_text(size = 5), 
+        strip.text.x = element_text(size = 5))
 ```
+
+\hfill\break
 
 ```{r Figure-S4, fig.height = 3.5, fig.cap = "\\textbf{Figure S4.} Central Moment 3 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
@@ -432,8 +451,14 @@ train %>%
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "St", y = "Central Moment 3", color = "Fr:Re")
+  labs(x = "St", y = "Central Moment 3", color = "Fr:Re") + 
+  theme(legend.title = element_text(size = 7), 
+        legend.text = element_text(size = 5), 
+        axis.title = element_text(size = 6),
+        axis.text = element_text(size = 5), 
+        strip.text.x = element_text(size = 5))
 ```
+\hfill\break
 
 ```{r Figure-S5, fig.height = 3.5, fig.cap = "\\textbf{Figure S5.} Central Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
 train %>%
@@ -441,23 +466,26 @@ train %>%
   geom_point() +
   geom_smooth() +
   facet_wrap(~ interaction(Fr, Re), scales = "free") +
-  labs(x = "St", y = "Central Moment 4", color = "Fr:Re")
+  labs(x = "St", y = "Central Moment 4", color = "Fr:Re") + 
+    theme(legend.title = element_text(size = 7), 
+        legend.text = element_text(size = 5), 
+        axis.title = element_text(size = 6),
+        axis.text = element_text(size = 5), 
+        strip.text.x = element_text(size = 5))
 ```
 
-\newpage 
+### Section B: Model Diagnoistics
 
-### Model Diagnoistics
-
-***Modeling assumptions for linear regression***: 
+**Modeling assumptions for linear regression**: 
 
 * **Linearity**: Linearity is satisfied for all 4 models since in the predicted vs. standardized residuals plots (Panel A), there's no obvious pattern in the residuals are the value of the predictors increase. The residuals are randomly scattered around 0, supporting that there's a linear relationship between the predictors and the response (after variable transformation). 
 * **Constant variance**: In the residuals vs. predicted plot for all 4 models, the vertical spread of the residual remain relatively constant as the predicted values increases, suggesting that the variance of the error is constant along all predicted values (Panel A). 
 * **Independence**: The data was generated from Direct Numerical Stimulation (DNS) of the Navier-Stokes equations, where each trial was conducted independently using different values of the parameter (Re, Fr, St). Based on the information about data collection, we believe the independence assumption is satisfied.
 * **Normality**: Normality may be violated since the distribution of the residuals doesn't follow a normal distribution and the points do not fall along a straight diagonal line on the normal quantile plot. The flat region in the normal quantile plot indicates there's a lot of nearly identical values, and the curved shape suggests that the distribution may be heavy-tailed. This violation makes sense in the context of the dataset since we observed that both the raw moments and central moments are highly skewed to the right with most values close to 0 with some extreme outliers (Panel B). 
 
-***Influential points and outliers***: We assessed influential points in our dataset using Cook's distance (Panel C). Besides having a few influential points for model 1, all observations had Cook's distance less than 0.5 for the rest of the models. In addition, from the predicted vs. standardized residuals plots (Panel A), there are only a few outliers with standardized residual greater than 5.
+**Influential points and outliers**: We assessed influential points in our dataset using Cook's distance (Panel C). Besides having a few influential points for model 1, all observations had Cook's distance less than 0.5 for the rest of the models. In addition, from the predicted vs. standardized residuals plots (Panel A), there are only a few outliers with standardized residual greater than 5.
 
-***Multicolinearity***: We assessed multicolinearity using variance inflation factor (VIF), which was below 10 for all predictors in all 4 models, suggesting no serious issue of multicolinearity. 
+**Multicolinearity**: We assessed multicolinearity using generalized variance inflation factor (GVIF) accounting for the degree of freedom, which was below 5 for all predictors in all 4 models, suggesting no serious issue of multicolinearity. 
 
 ```{r diag}
 diag_plot <- function(model) {
@@ -467,7 +495,7 @@ diag_plot <- function(model) {
 
   resid_fitted <- ggplot(data = model_aug, aes(x = .fitted, y = .std.resid)) +
     geom_point(alpha = 0.7) +
-    geom_hline(yintercept = c(-2, 2), color = "blue", lty = 2) +
+    #geom_hline(yintercept = c(-2, 2), color = "blue", lty = 2) +
     geom_hline(yintercept = c(-3, 3), color = "red", lty = 3) +
     labs(x = "Predicted values",
          y = "Standardized Residual",
@@ -502,44 +530,42 @@ diag_plot <- function(model) {
 }
 ```
 
-```{r Diag Model 1, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 1."}
+```{r Diag Model 1, fig.height = 4, fig.cap = "\\textbf{Figure S6.} Diagnoistic plots for Model 1."}
 diag_plot(model1)
 ```
 
-```{r}
-vif(model1) %>% kable(format = "markdown")
-```
-
-```{r Diag Model 2, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 2."}
+```{r Diag Model 2, fig.height = 4, fig.cap = "\\textbf{Figure S7.} Diagnoistic plots for Model 2."}
 diag_plot(model2)
 ```
 
-```{r}
-vif(model2) %>% kable(format = "markdown")
-```
-
-```{r Diag Model 3, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 3."}
+```{r Diag Model 3, fig.height = 4, fig.cap = "\\textbf{Figure S8.} Diagnoistic plots for Model 3."}
 diag_plot(model3)
 ```
 
-```{r}
-vif(model3) %>% kable(format = "markdown")
-```
-
-```{r Diag Model 4, fig.height = 5, fig.cap = "\\textbf{Figure S?.} Diagnoistic plots for Model 4."}
+```{r Diag Model 4, fig.height = 4, fig.cap = "\\textbf{Figure S9.} Diagnoistic plots for Model 4."}
 diag_plot(model4)
 ```
 
 ```{r}
-vif(model4) %>% kable(format = "markdown")
-``` 
+`Model Name` <- c("model 1", "model 1", "model 1",
+                  "model 2", "model 2", "model 2",
+                  "model 3", "model 3", "model 3",
+                  "model 4", "model 4", "model 4")
 
-\newpage
+VIF_all <- rbind(round(vif(model1), 3), round(vif(model2), 3), 
+                 round(vif(model3), 3), round(vif(model4), 3)) %>% 
+  cbind(`Model Name`) 
+colnames(VIF_all) <- c("GVIF", "DF", "GVIF (adjusted for DF)", "Model")
 
-### Tables 
+kable(VIF_all, format = "markdown", caption = "The variable inflation factor (VIF) for all model coefficients")
+```
 
-```{r table-s1 cv results, echo=FALSE}
-tableS1 <-cv_summarized %>% 
+### Section C: Tables 
+
+Model outputs are shown below: 
+
+```{r table-s1 cv results}
+tableS1 <- cv_summarized %>% 
   tidyr::pivot_longer(cols = c(rmse, adj.r.squared)) %>% 
   dplyr::group_by(moment, name) %>% 
   dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
@@ -547,14 +573,19 @@ tableS1 <-cv_summarized %>%
   filter(value == best) %>% 
   select(moment, degree, root, log, name, value) %>% 
   mutate(value = scales::comma(value, accuracy = 0.00001)) 
-kable(tableS1, booktabs = T)%>% 
-  kable_styling(position = "center")  %>% 
-  footnote(general = "Errors from final models for each moment",
-           general_title = "Table S1.",
-           footnote_as_chunk = TRUE,
-           title_format = "bold",
-           escape = FALSE,
-           threeparttable = TRUE)
+# 
+# colnames(tableS1) <- c("Moment", "Degree", "Root", "Log", "Name", "Value")
+# 
+# kable(tableS1, format = "markdown", caption = "Errors from final models for each moment")
+
+# kable(tableS1, booktabs = T)%>% 
+#   kable_styling(position = "center")  %>% 
+#   footnote(general = "Errors from final models for each moment",
+#            general_title = "Table S2.",
+#            footnote_as_chunk = TRUE,
+#            title_format = "bold",
+#            escape = FALSE,
+#            threeparttable = TRUE)
 ```
 
 ```{r table-s2}
@@ -565,16 +596,16 @@ mod1 <- tidy(model1) %>%
     p.value > 0.999 ~ ">0.999",
     TRUE ~ as.character(p.value)
   ))
-kable(mod1, booktabs = T, escape = F, linesep = NULL, col.names = c(
-          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-        ))%>% 
-  kable_styling(position = "center")  %>% 
-  footnote(general = "Full output of the final model for predicting Moment One",
-           general_title = "Table S2.",
-           footnote_as_chunk = TRUE,
-           title_format = "bold",
-           escape = FALSE,
-           threeparttable = TRUE)
+# kable(mod1, booktabs = T, escape = F, linesep = NULL, col.names = c(
+#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+#         ))%>% 
+#   kable_styling(position = "center")  %>% 
+#   footnote(general = "Full output of the final model for predicting Moment One",
+#            general_title = "Table S2.",
+#            footnote_as_chunk = TRUE,
+#            title_format = "bold",
+#            escape = FALSE,
+#            threeparttable = TRUE)
 ```
 
 ```{r table-s3}
@@ -585,16 +616,16 @@ mod2 <- tidy(model2) %>%
     p.value > 0.999 ~ ">0.999",
     TRUE ~ as.character(p.value)
   )) 
-kable(mod2, booktabs = T, escape = F, linesep = NULL, col.names = c(
-          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-        ))%>% 
-  kable_styling(position = "center")  %>% 
-  footnote(general = "Full output of the final model for predicting Central Moment Two",
-           general_title = "Table S3.",
-           footnote_as_chunk = TRUE,
-           title_format = "bold",
-           escape = FALSE,
-           threeparttable = TRUE)
+# kable(mod2, booktabs = T, escape = F, linesep = NULL, col.names = c(
+#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+#         ))%>% 
+#   kable_styling(position = "center")  %>% 
+#   footnote(general = "Full output of the final model for predicting Central Moment Two",
+#            general_title = "Table S3.",
+#            footnote_as_chunk = TRUE,
+#            title_format = "bold",
+#            escape = FALSE,
+#            threeparttable = TRUE)
 ```
 
 ```{r table-s4}
@@ -605,16 +636,16 @@ mod3 <- tidy(model3) %>%
     p.value > 0.999 ~ ">0.999",
     TRUE ~ as.character(p.value)
   )) 
-kable(mod3, booktabs = T, escape = F, linesep = NULL, col.names = c(
-          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-        ))%>% 
-  kable_styling(position = "center")  %>% 
-  footnote(general = "Full output of the final model for predicting Central Moment Three",
-           general_title = "Table S4.",
-           footnote_as_chunk = TRUE,
-           title_format = "bold",
-           escape = FALSE,
-           threeparttable = TRUE)
+# kable(mod3, booktabs = T, escape = F, linesep = NULL, col.names = c(
+#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+#         ))%>% 
+#   kable_styling(position = "center")  %>% 
+#   footnote(general = "Full output of the final model for predicting Central Moment Three",
+#            general_title = "Table S4.",
+#            footnote_as_chunk = TRUE,
+#            title_format = "bold",
+#            escape = FALSE,
+#            threeparttable = TRUE)
 ```
 
 ```{r table-s5}
@@ -625,21 +656,23 @@ mod4 <- tidy(model4) %>%
     p.value > 0.999 ~ ">0.999",
     TRUE ~ as.character(p.value)
   )) 
-kable(mod4, booktabs = T, escape = F, linesep = NULL, col.names = c(
-          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-        ))%>% 
-  kable_styling(position = "center")  %>% 
-  footnote(general = "Full output of the final model for predicting Central Moment Five",
-           general_title = "Table S5.",
-           footnote_as_chunk = TRUE,
-           title_format = "bold",
-           escape = FALSE,
-           threeparttable = TRUE)
+
+# kable(mod4, booktabs = T, escape = F, linesep = NULL, col.names = c(
+#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+#         ))%>% 
+#   kable_styling(position = "center")  %>% 
+#   footnote(general = "Full output of the final model for predicting Central Moment Five",
+#            general_title = "Table S5.",
+#            footnote_as_chunk = TRUE,
+#            title_format = "bold",
+#            escape = FALSE,
+#            threeparttable = TRUE)
 ```
 
 
 ```{r eval = FALSE}
 # Note: don't perform as well because splines tend to require more data to fit + extrapolation means more uncertainty generally
+
 model1 <- train %>%
   lm(R_moment_1 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
 summary(model1)
@@ -657,16 +690,18 @@ summary(model4)
 ```
 
 ```{r}
-train %>%
-  ggplot(aes(x = St, y = R_moment_1, color = interaction(Re,Fr))) +
-  geom_point()
-train %>%
-  ggplot(aes(x = St, y = central_2, color = interaction(Re,Fr))) +
-  geom_point()
-train %>%
-  ggplot(aes(x = St, y = central_3, color = interaction(Re,Fr))) +
-  geom_point()
-train %>%
-  ggplot(aes(x = St, y = central_4, color = interaction(Re,Fr))) +
-  geom_point()
+# Should we include them?
+
+# train %>%
+#   ggplot(aes(x = St, y = R_moment_1, color = interaction(Re,Fr))) +
+#   geom_point()
+# train %>%
+#   ggplot(aes(x = St, y = central_2, color = interaction(Re,Fr))) +
+#   geom_point()
+# train %>%
+#   ggplot(aes(x = St, y = central_3, color = interaction(Re,Fr))) +
+#   geom_point()
+# train %>%
+#   ggplot(aes(x = St, y = central_4, color = interaction(Re,Fr))) +
+#   geom_point()
 ```
