@@ -42,9 +42,9 @@ train <- train %>%
 
 Turbulence is a fundamental concept in fluid mechanics. Irregular, unpredictable, and energy-dissipating, turbulent flow enhances mixing, which leads to non-uniform distribution of particles and cluster formation. Understanding and predicting turbulence has great practical significance in many scientific areas including aeronautical engineering and environmental science.
 
-Existing research suggests that the clustering of particles subject to turbulent flow is mainly determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number, which correspond to the intensity of turbulence, impact of gravitational acceleration, and particle size properties (Chanson, 2009; Ireland et al., 2016). These parameters may influence clustering individually; a large $St$, for example, correlates with large particle size, which tends to form relatively loose clusters (Ireland et al., 2016). The parameters may also interact with each other to impact cluster formation.
+Existing research suggests that the clustering of particles subject to turbulent flow is mainly determined by three main parameters: Reynolds (Re) number, Froude (Fr) number and Stokes (St) number, which correspond to the intensity of turbulence, impact of gravitational acceleration, and particle size properties (Chanson, 2009; Ireland et al., 2016). These parameters may influence clustering individually; a large $St$, for example, correlates with large particle size, which tends to form relatively loose clusters (Ireland et al., 2016). The parameters may also interact with each other to impact cluster formation (e.g. Zamansky, 2013).
 
-Despite the importance of turbulence, current understanding of *how* Re, Fr, and St contribute to clustering remains rudimentary. Simulation methods like the Direct Numerical Simulation (DNS) of Navier-Stokes equations have been applied, but progress is limited by the time-consuming and computationally-expensive nature of such methodologies (Moin & Mahesh, 1998). Leveraging on generated data, the present study *aims* to build a statistical model that investigates how Re, Fr and St influence particle cluster volume distribution. We hope that our model will 1) enhance our understanding of the relative influence of these parameters in turbulent flow, and 2) enable an efficient and accurate prediction of a particle cluster volume distribution without the need for simulation.
+Despite the importance of turbulence, current understanding of *how* Re, Fr, and St contribute to clustering remains rudimentary. Simulation methods like the Direct Numerical Simulation (DNS) of Navier-Stokes equations have been applied, but progress is limited by the time-consuming and computationally-expensive nature of such methodologies (Moin & Mahesh, 1998). Leveraging generated data, the present study *aims* to build a statistical model that investigates how Re, Fr and St influence particle cluster volume distribution. We hope that our model will 1) enhance our understanding of the relative influence of these parameters in turbulent flow, and 2) enable an efficient and accurate prediction of a particle cluster volume distribution without the need for simulation.
 
 ### 2 Methods
 
@@ -52,17 +52,15 @@ Despite the importance of turbulence, current understanding of *how* Re, Fr, and
 
 The data (*n* = 89) for the present study come from Direct Numerical Simulation. Voronoi Tessellation, a technique that examines general features of individual clusters in the underlying turbulence, was applied to generate a distribution of cluster volumes. The original data contains information regarding the generated distributions in the form of the first four raw moments $\mathbb E(X)$, $\mathbb E(X^2)$, $\mathbb E(X^3)$, and $\mathbb E(X^4)$, as well as Re, Fr, and St values. 
 
-For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments (Moment 1 is untouched as it already signifies the mean), which are related to the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, despite their numerical natures, Fr and Re only contain three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$, see Figure S1 for distribution) in the training data. We decided to model them as categorical variables because 1) treating them as numeric variables puts our model at risk for extrapolation due to lack of data at many levels of Re and Fr, making our model unable to learn the trends around such regions and 2) we believe that these categories could carry some real life significance. For instance, Fr = 0.3 is representative of cumulonimbus clouds and 0.052 is representative of cumulus clouds. Interpreting their effect in categories can offer insight on practical examples (?). <!-- how to word this -->
+For better interpretability, we transformed the 2nd, 3rd, and 4th raw moments into central moments (Moment 1 is untouched as it already signifies the mean), which are related to the variance (how flow varies over time), skewness (indication of symmetric properties of the flow), and kurtosis of the distribution (how particular cluster volumes deviate). In addition, despite their numerical natures, Fr and Re only contain three levels ($Fr \in \{0.052, 0.3, \inf\}$ and $Re \in \{90, 224, 398\}$, see Figure S1 for distribution) in the training data. We decided to model them as categorical variables because 1) treating them as numeric variables puts our model at risk for extrapolation due to lack of data at many levels of Re and Fr, making our model unable to learn the trends around such regions and 2) we believe that these categories could carry some real life significance. For instance, Fr = 0.3 is representative of cumulonimbus clouds and 0.052 is representative of cumulus clouds. Focusing on observations collected at such specific levels may lend unique insights into practical problems. 
 
 #### 2.2 Model Construction
 
-A closer examination of the data revealed interesting interactive patterns among the independent and dependent variables. Specifically, $St$ appears to assume a strong, non-linear relationship with each of the moments (Figures S1-S4 in the Appendix). These relationships vary between roughly linear to noticeably curved, potentially quadratic or cubic. In addition, such relationships diverge across different moments, and appear highly influenced by the combined levels of $Re$ and $Fr$. From the curved shape of the relationship between $St$ and the responses, we also noticed that we may benefit from taking certain roots of $St$ to increase linearity. 
+A closer examination of the data revealed interesting interactive patterns among the independent and dependent variables. Specifically, $St$ appears to assume a strong, non-linear relationship with each of the moments (Figures S1-S4 in the Appendix). These relationships vary between roughly linear to noticeably curved, potentially quadratic or cubic. In addition, such relationships diverge across different moments, and appear highly influenced by the combined levels of $Re$ and $Fr$. From the curved shape of the relationship between $St$ and the responses, we also noticed that linearity may be improved by taking certain roots of $St$. 
 
-Given the paucity of theoretical background in related fields to guide model building, we decided to adopt a k-fold cross validation approach. This approach would allow us to explore different combinations of polynomial patterns and the interactions observed in our EDA and select the best fit model. Specifically, we used K = 5 given the small sample size at hand to avoid overfitting. 
+Given the paucity of theoretical background in related fields to guide model building, we decided to adopt a k-fold cross validation approach. This approach would allow us to explore different combinations of polynomial patterns and the interactions observed in our EDA and select the best fit model. Specifically, we used K = 5 given the small sample size at hand to avoid overfitting. We also decided to build linear models, as they are easy to interpret and could provide relatively straightforward indications on the relationship between our predictors and outcomes. 
 
-<!-- JL: should we talk about why selecting a linear model? --> 
-
-To implement the k-fold cross validation, for each moment, we trained candidate models to predict the moment with the general formula $Moment_i \sim poly(St_i^{(1/root)} , degree)*(Fr, Re)$, varying the *degree* parameter from 1 to 3, *root* from 1 to 6, and testing a log transformation of the response. Literature supports a logarithmic dependence of acceleration on the Reynolds number (Zamansky, 2013); thus, we combined $Fr$ and $Re$ to form a new interaction variable $(Fr, Re)$ with 9 levels representing all combinations of $Fr$ and $Re$. We tested the model on each fold, and chose the parameters that gave lower root mean squared errors (See Figure 1), with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset using standard least-squares for interpretation. 
+To implement the k-fold cross validation, for each moment, we trained candidate models to predict the moment with the general formula $Moment_i \sim poly(St_i^{(1/root)} , degree)*(Fr, Re)$, varying the *degree* parameter from 1 to 3, *root* from 1 to 6, and testing a log transformation of the response. Literature supports a logarithmic dependence of acceleration on the Reynolds number (Zamansky, 2013); thus, we combined $Fr$ and $Re$ to form a new interaction variable $(Fr, Re)$ with 9 levels representing all combinations of $Fr$ and $Re$ in our data. We tested the model on each fold, and chose the parameters that gave lower root mean squared errors (See Figure 1), with preference for less complexity if the error is similar. After selecting the features for each moment's model, we then fit the final models on the full training dataset. 
 
 ```{r factors, echo=FALSE}
 # make Fr, Re factors
@@ -210,7 +208,7 @@ $$\text{Central Moment}_2 \sim \text{poly}(St^{1/4}, 2) * (Fr, Re)$$
 $$\text{Central Moment}_3 \sim \text{poly}(St^{1/3}, 2) * (Fr, Re)$$
 $$\text{Central Moment}_4 \sim \text{poly}(\sqrt{St}, 2) * (Fr, Re)$$
 
-The linearity, constant variance, and independence assumptions for linear regression are satisfied, but we observed some violation of normality. There are a few outliers and influential points. Furthermore, the variance inflation factors indicated no serious concerns of multicollinearity (Model diagnostics section in the Appendix). 
+The linearity, constant variance, and independence assumptions for linear regression are satisfied, and no serious concerns of multicollinearity was found. We observed some violations of normality, as well as a few outliers and influential points. For further details on model diagnostics, please refer to the Appendix. 
 
 #### 2.3 Model Extension
 
@@ -220,7 +218,7 @@ $$\text{Raw Moment}_1 \sim \text{ns}(St, df=1)*Re*Fr'$$
 $$\text{Raw Moment}_{2,3,4} \sim \text{ns}(\sqrt{St}, df=1)*Re*Fr'$$
 In these models, $Re$ is numeric and $Fr$ is transformed to a numeric variable on $[0, 1]$ using $Fr' = \frac{2}{\pi}*arctan(Fr)$. The form is similar in keeping the significant three-way interaction, except with natural splines to address the poor fits of polynomials at the tails, a location that is especially important in learning about particle behavior in high turbulence. Again, the root and degree are chosen through 5-fold cross validation. See Appendix for fitted coefficients.
 
-### Results
+### 3 Results
 
 Selected outputs from the final models of each moment are displayed in Table 1. Please refer to Table S1 for the error values for the final models and Tables S2-S5 for full outputs.
 
@@ -357,9 +355,9 @@ test <- test %>%
 # write.csv(test, file="data/data-test_pred.csv")
 ```
 
-Firstly, all models possess an adjusted $R^2$ of at least 0.98, indicating that at least 98% of the variation in each centralized moment is explained by the predictors in the models (Table S1 in the Appendix). The test error (modeled by root mean squared error) from $k$-fold cross validation is only 0.00764 and 20.86 for models of centralized moments 1 and 2, respectively. Although the values are larger for models of centralized moments 3 and 4 (above 200,000 and above 1 million, respectively), this is expected given the extremely large variation in these moments. Overall, these metrics indicate that our model has good predictive power. 
+Firstly, all models possess an adjusted $R^2$ of at least 0.98 (See Table S1), indicating that at least 98% of the variation in each centralized moment is explained by the predictors in the models. The test error (modeled by root mean squared error) from $k$-fold cross validation is only 0.00764 and 20.86 for models of centralized moments 1 and 2, respectively. Although the values are larger for models of centralized moments 3 and 4 (above 200,000 and above 1 million, respectively), this is expected given the extremely large variation in these moments. Overall, these metrics indicate that our model has good predictive power. 
 
-To better understand the relative influence of turbulence, gravitational acceleration and particle characteristics on cluster formation, we examined the model coefficients. For centralized moment 1, we see that interactions between all settings of Fr and the lowest setting of Re, along with their interactions with St, yield an expected increase in mean particle cluster volume size. This indicates that smoother flow at any level of gravitational acceleration and particle size may allow larger clusters to form, as they are not broken up by chaotic turbulence. These coefficients are statistically significant at the $\alpha = 0.01$ level with small standard errors. For centralized moments 2, 3, and 4, it appears that the interaction between lowest Fr and lowest Re, along with its interaction with St, has a positive association with each moment. The interaction with squared St has a negative association with each moment (note that the exact value of this squared transformation differs based on the root transformation applied to St for each moment) (?????? ask simon about interpreting positive non-squared, negative squared). This indicates that smoother flow and low gravitational acceleration are associated with greater variance, skew, and kurtosis (distributional "tailedness") of particle cluster size. The effect of particle size at these levels of Re and Fr may differ from the effect at other levels, as it is only statistically significant at these low settings of flow intensity and gravitational acceleration. These coefficients are statistically significant at the $\alpha = 0.01$ level.  
+To better understand the relative influence of turbulence, gravitational acceleration and particle characteristics on cluster formation, we examined the model coefficients. For centralized moment 1, we see that interactions between all settings of Fr and the lowest setting of Re, along with their interactions with St, yield an expected increase in mean particle cluster volume size. This indicates that smoother flow at any level of gravitational acceleration and particle size may allow larger clusters to form, as they are not broken up by chaotic turbulence. These coefficients are statistically significant at the $\alpha = 0.01$ level with small standard errors. For centralized moments 2, 3, and 4, it appears that the interaction between lowest Fr (90) and lowest Re (0.052), along with its interaction with St, has a positive association with each moment. The interaction with squared St has a negative association with each moment (note that the exact value of this squared transformation differs based on the root transformation applied to St for each moment) (?????? ask simon about interpreting positive non-squared, negative squared). This indicates that smoother flow and low gravitational acceleration are associated with greater variance, skew, and kurtosis (distributional "tailedness") of particle cluster size. The effect of particle size at these levels of Re and Fr may differ from the effect at other levels, as it is only statistically significant at these low settings of flow intensity and gravitational acceleration. These coefficients are statistically significant at the $\alpha = 0.01$ level.  
 
 ### Discussion
 
@@ -396,7 +394,197 @@ In addition, given the training set, our model was only fit on Reynolds numbers 
 
 ## Appendix 
 
-### Section A: Figures 
+### Section A: Tables 
+
+Model outputs are shown below: 
+
+```{r table-s1 cv results}
+tableS1 <- cv_summarized %>% 
+  tidyr::pivot_longer(cols = c(rmse, adj.r.squared)) %>% 
+  dplyr::group_by(moment, name) %>% 
+  dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
+  ungroup() %>% 
+  filter(value == best) %>% 
+  select(moment, degree, root, log, name, value) %>% 
+  mutate(value = scales::comma(value, accuracy = 0.00001)) 
+ 
+colnames(tableS1) <- c("Moment", "Degree", "Root", "Log", "Name", "Value")
+# 
+# kable(tableS1, format = "markdown", caption = "Errors from final models for each moment")
+
+kable(tableS1, booktabs = T)%>% 
+   kable_styling(position = "center")  %>% 
+   footnote(general = "Errors from final models for each moment",
+            general_title = "Table S1.",
+            footnote_as_chunk = TRUE,
+            title_format = "bold",
+            escape = FALSE,
+            threeparttable = TRUE)
+```
+
+```{r table-s2}
+mod1 <- tidy(model1) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  ))
+ kable(mod1, booktabs = T, escape = F, linesep = NULL, col.names = c(
+           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+         ))%>% 
+   kable_styling(position = "center")  %>% 
+   footnote(general = "Full output of the final model for predicting Moment One",
+            general_title = "Table S2.",
+            footnote_as_chunk = TRUE,
+            title_format = "bold",
+            escape = FALSE,
+            threeparttable = TRUE)
+```
+
+```{r table-s3}
+mod2 <- tidy(model2) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  )) 
+ kable(mod2, booktabs = T, escape = F, linesep = NULL, col.names = c(
+           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+         ))%>% 
+   kable_styling(position = "center")  %>% 
+   footnote(general = "Full output of the final model for predicting Central Moment Two",
+            general_title = "Table S3.",
+            footnote_as_chunk = TRUE,
+            title_format = "bold",
+            escape = FALSE,
+            threeparttable = TRUE)
+```
+
+```{r table-s4}
+mod3 <- tidy(model3) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  )) 
+ kable(mod3, booktabs = T, escape = F, linesep = NULL, col.names = c(
+           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+         ))%>% 
+   kable_styling(position = "center")  %>% 
+   footnote(general = "Full output of the final model for predicting Central Moment Three",
+            general_title = "Table S4.",
+            footnote_as_chunk = TRUE,
+            title_format = "bold",
+            escape = FALSE,
+            threeparttable = TRUE)
+```
+
+```{r table-s5}
+mod4 <- tidy(model4) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    p.value > 0.999 ~ ">0.999",
+    TRUE ~ as.character(p.value)
+  )) 
+
+ kable(mod4, booktabs = T, escape = F, linesep = NULL, col.names = c(
+           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+         ))%>% 
+   kable_styling(position = "center")  %>% 
+   footnote(general = "Full output of the final model for predicting Central Moment Five",
+            general_title = "Table S5.",
+            footnote_as_chunk = TRUE,
+            title_format = "bold",
+            escape = FALSE,
+            threeparttable = TRUE)
+```
+
+
+```{r Table S6, eval = T}
+# Note: don't perform as well because splines tend to require more data to fit + extrapolation means more uncertainty generally
+
+model_1 <- train %>%
+  lm(R_moment_1 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+model_2 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  lm(R_moment_2 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+model_3 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  lm(R_moment_3 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+model_4 <- train %>%
+  mutate(St = sqrt(St)) %>%
+  lm(R_moment_4 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
+
+model_1 <- tidy(model_1)%>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+model_2 <- tidy(model_2)%>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+model_3 <- tidy(model_3) %>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+model_4 <- tidy(model_4)%>%
+  mutate(across(where(is.numeric), ~ round(.x, digits = 3))) %>%
+  mutate(p.value = case_when(
+    p.value < 0.001 ~ "<0.001",
+    TRUE ~ as.character(p.value)
+  ))
+
+spline.table <- rbind(mod.1, model_1, mod.2, model_2,mod.3,  model_3, mod.4, model_4)
+
+spline.table[1,1] <- cell_spec(spline.table[1,1], bold = T)
+spline.table[10,1] <- cell_spec(spline.table[10,1], bold = T)
+spline.table[19,1] <- cell_spec(spline.table[19,1], bold = T)
+spline.table[28,1] <- cell_spec(spline.table[28,1], bold = T)
+ kable(spline.table, format = "latex", 
+        escape = F, booktabs = T, longtable=T, linesep = NULL,
+        col.names = c(
+          "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
+        )) %>% 
+  kable_styling(position = "center")  %>% 
+  footnote(general = "Outputs from the spline model from Section 2.4.",
+           general_title = "Table S6.",
+           footnote_as_chunk = TRUE,
+           title_format = "bold",
+           escape = FALSE,
+           threeparttable = TRUE)
+```
+
+```{r}
+# Should we include them?
+
+# train %>%
+#   ggplot(aes(x = St, y = R_moment_1, color = interaction(Re,Fr))) +
+#   geom_point()
+# train %>%
+#   ggplot(aes(x = St, y = central_2, color = interaction(Re,Fr))) +
+#   geom_point()
+# train %>%
+#   ggplot(aes(x = St, y = central_3, color = interaction(Re,Fr))) +
+#   geom_point()
+# train %>%
+#   ggplot(aes(x = St, y = central_4, color = interaction(Re,Fr))) +
+#   geom_point()
+```
+
+### Section B: Figures 
 
 ```{r fig-S1, fig.height = 3, fig.width=8, fig.cap="\\textbf{Figure S1.} Distribution of the three levels of Re and Fr. The values are treated as factor levels in our main analysis."}
 # histograms of predictors
@@ -458,6 +646,7 @@ train %>%
         axis.text = element_text(size = 5), 
         strip.text.x = element_text(size = 5))
 ```
+
 \hfill\break
 
 ```{r Figure-S5, fig.height = 3.5, fig.cap = "\\textbf{Figure S5.} Central Moment 4 values as a function of particle size at different levels of interaction between Fr and Re."}
@@ -474,7 +663,9 @@ train %>%
         strip.text.x = element_text(size = 5))
 ```
 
-### Section B: Model Diagnoistics
+\newpage
+
+### Section C: Model Diagnoistics
 
 **Modeling assumptions for linear regression**: 
 
@@ -530,19 +721,19 @@ diag_plot <- function(model) {
 }
 ```
 
-```{r Diag Model 1, fig.height = 4, fig.cap = "\\textbf{Figure S6.} Diagnoistic plots for Model 1."}
+```{r Diag Model 1, fig.height = 4, fig.cap = "\\textbf{Figure S6.} Diagnoistic plots for model predicting Moment 1."}
 diag_plot(model1)
 ```
 
-```{r Diag Model 2, fig.height = 4, fig.cap = "\\textbf{Figure S7.} Diagnoistic plots for Model 2."}
+```{r Diag Model 2, fig.height = 4, fig.cap = "\\textbf{Figure S7.} Diagnoistic plots for model predicting Moment 2."}
 diag_plot(model2)
 ```
 
-```{r Diag Model 3, fig.height = 4, fig.cap = "\\textbf{Figure S8.} Diagnoistic plots for Model 3."}
+```{r Diag Model 3, fig.height = 4, fig.cap = "\\textbf{Figure S8.} Diagnoistic plots for model predicting Moment 3."}
 diag_plot(model3)
 ```
 
-```{r Diag Model 4, fig.height = 4, fig.cap = "\\textbf{Figure S9.} Diagnoistic plots for Model 4."}
+```{r Diag Model 4, fig.height = 4, fig.cap = "\\textbf{Figure S9.} Diagnoistic plots for model predicting Moment 4."}
 diag_plot(model4)
 ```
 
@@ -557,151 +748,12 @@ VIF_all <- rbind(round(vif(model1), 3), round(vif(model2), 3),
   cbind(`Model Name`) 
 colnames(VIF_all) <- c("GVIF", "DF", "GVIF (adjusted for DF)", "Model")
 
-kable(VIF_all, format = "markdown", caption = "The variable inflation factor (VIF) for all model coefficients")
-```
-
-### Section C: Tables 
-
-Model outputs are shown below: 
-
-```{r table-s1 cv results}
-tableS1 <- cv_summarized %>% 
-  tidyr::pivot_longer(cols = c(rmse, adj.r.squared)) %>% 
-  dplyr::group_by(moment, name) %>% 
-  dplyr::mutate(best = ifelse(name == "adj.r.squared", max(value), min(value))) %>% 
-  ungroup() %>% 
-  filter(value == best) %>% 
-  select(moment, degree, root, log, name, value) %>% 
-  mutate(value = scales::comma(value, accuracy = 0.00001)) 
-# 
-# colnames(tableS1) <- c("Moment", "Degree", "Root", "Log", "Name", "Value")
-# 
-# kable(tableS1, format = "markdown", caption = "Errors from final models for each moment")
-
-# kable(tableS1, booktabs = T)%>% 
-#   kable_styling(position = "center")  %>% 
-#   footnote(general = "Errors from final models for each moment",
-#            general_title = "Table S2.",
-#            footnote_as_chunk = TRUE,
-#            title_format = "bold",
-#            escape = FALSE,
-#            threeparttable = TRUE)
-```
-
-```{r table-s2}
-mod1 <- tidy(model1) %>%
-  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
-  mutate(p.value = case_when(
-    p.value < 0.001 ~ "<0.001",
-    p.value > 0.999 ~ ">0.999",
-    TRUE ~ as.character(p.value)
-  ))
-# kable(mod1, booktabs = T, escape = F, linesep = NULL, col.names = c(
-#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-#         ))%>% 
-#   kable_styling(position = "center")  %>% 
-#   footnote(general = "Full output of the final model for predicting Moment One",
-#            general_title = "Table S2.",
-#            footnote_as_chunk = TRUE,
-#            title_format = "bold",
-#            escape = FALSE,
-#            threeparttable = TRUE)
-```
-
-```{r table-s3}
-mod2 <- tidy(model2) %>%
-  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
-  mutate(p.value = case_when(
-    p.value < 0.001 ~ "<0.001",
-    p.value > 0.999 ~ ">0.999",
-    TRUE ~ as.character(p.value)
-  )) 
-# kable(mod2, booktabs = T, escape = F, linesep = NULL, col.names = c(
-#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-#         ))%>% 
-#   kable_styling(position = "center")  %>% 
-#   footnote(general = "Full output of the final model for predicting Central Moment Two",
-#            general_title = "Table S3.",
-#            footnote_as_chunk = TRUE,
-#            title_format = "bold",
-#            escape = FALSE,
-#            threeparttable = TRUE)
-```
-
-```{r table-s4}
-mod3 <- tidy(model3) %>%
-  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
-  mutate(p.value = case_when(
-    p.value < 0.001 ~ "<0.001",
-    p.value > 0.999 ~ ">0.999",
-    TRUE ~ as.character(p.value)
-  )) 
-# kable(mod3, booktabs = T, escape = F, linesep = NULL, col.names = c(
-#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-#         ))%>% 
-#   kable_styling(position = "center")  %>% 
-#   footnote(general = "Full output of the final model for predicting Central Moment Three",
-#            general_title = "Table S4.",
-#            footnote_as_chunk = TRUE,
-#            title_format = "bold",
-#            escape = FALSE,
-#            threeparttable = TRUE)
-```
-
-```{r table-s5}
-mod4 <- tidy(model4) %>%
-  mutate(across(where(is.numeric), ~ round(.x, digits = 3)))%>%
-  mutate(p.value = case_when(
-    p.value < 0.001 ~ "<0.001",
-    p.value > 0.999 ~ ">0.999",
-    TRUE ~ as.character(p.value)
-  )) 
-
-# kable(mod4, booktabs = T, escape = F, linesep = NULL, col.names = c(
-#           "Term", "$\\beta$", "$SE$", "$t$", "$p$ value"
-#         ))%>% 
-#   kable_styling(position = "center")  %>% 
-#   footnote(general = "Full output of the final model for predicting Central Moment Five",
-#            general_title = "Table S5.",
-#            footnote_as_chunk = TRUE,
-#            title_format = "bold",
-#            escape = FALSE,
-#            threeparttable = TRUE)
-```
-
-
-```{r eval = FALSE}
-# Note: don't perform as well because splines tend to require more data to fit + extrapolation means more uncertainty generally
-
-model1 <- train %>%
-  lm(R_moment_1 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
-summary(model1)
-model2 <- train %>%
-  mutate(St = sqrt(St)) %>%
-  lm(R_moment_2 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
-model3 <- train %>%
-  mutate(St = sqrt(St)) %>%
-  lm(R_moment_3 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
-summary(model3)
-model4 <- train %>%
-  mutate(St = sqrt(St)) %>%
-  lm(R_moment_4 ~ ns(St, df=1)*Re.numeric*Fr.numeric, data= .)
-summary(model4)
-```
-
-```{r}
-# Should we include them?
-
-# train %>%
-#   ggplot(aes(x = St, y = R_moment_1, color = interaction(Re,Fr))) +
-#   geom_point()
-# train %>%
-#   ggplot(aes(x = St, y = central_2, color = interaction(Re,Fr))) +
-#   geom_point()
-# train %>%
-#   ggplot(aes(x = St, y = central_3, color = interaction(Re,Fr))) +
-#   geom_point()
-# train %>%
-#   ggplot(aes(x = St, y = central_4, color = interaction(Re,Fr))) +
-#   geom_point()
+kable(VIF_all, format = "markdown") %>% 
+   kable_styling(position = "center")  %>% 
+   footnote(general = "The variable inflation factor (VIF) for all model coefficients",
+            general_title = "Table S6.",
+            footnote_as_chunk = TRUE,
+            title_format = "bold",
+            escape = FALSE,
+            threeparttable = TRUE)
 ```
